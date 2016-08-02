@@ -243,3 +243,9 @@ ModelManifest.xml
 
 # FAKE - F# Make
 .fake/
+/kuOpenVRTest/ProjectionMatrix/RightProjectionMatrix_10-100.txt
+/kuOpenVRTest/ProjectionMatrix/RightProjectionMatrix_0.1-500.txt
+/kuOpenVRTest/ProjectionMatrix/RightProjectionMatrix_0.1-100.txt
+/kuOpenVRTest/ProjectionMatrix/LeftProjectionMatrix_10-100.txt
+/kuOpenVRTest/ProjectionMatrix/LeftProjectionMatrix_0.1-500.txt
+/kuOpenVRTest/ProjectionMatrix/LeftProjectionMatrix_0.1-100.txt

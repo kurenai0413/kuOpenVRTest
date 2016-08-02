@@ -1,41 +1,229 @@
 #include <GLEW/glew.h>
 #include <GLEW/wglew.h>
 #include <GLFW/glfw3.h> 
-#include <opencv2/opencv.hpp>
+#include <OpenVR.h>
 
 #include <cstring>
 #include <cassert>
 #include <iostream>
+#include <fstream>
+#include <vector>
+
+#include "vectors.h"
 
 #ifdef _DEBUG
 #pragma comment(lib, "opengl32")
 #pragma comment(lib, "glew32d")
 #pragma comment(lib, "glfw3")
 #pragma comment(lib, "opencv_world310d")
+#pragma comment(lib, "openvr_api")
 #endif
 
 //#define _VR
 
-GLFWwindow* initOpenGL(int width, int height, const std::string& title);
+#define Left  0
+#define Right 1
 
-GLFWwindow * window = nullptr;
+#define nearPlaneZ 0.1
+#define farPlaneZ  100
+
+using namespace std;
+
+
+
+GLFWwindow		*	window = nullptr;
+vr::IVRSystem	*	hmd    = nullptr;
+
+#pragma region // Frame Buffer Containers
+/////////////////////////////////////////////////////////////////////////////////////////
+struct FrameBufferDesc
+{
+	GLuint	SceneTextureId;
+	GLuint	SceneFrameBufferId;
+	GLuint	DistortedTextureId;
+	GLuint	DistortedFrameBufferId;
+};
+FrameBufferDesc	EyeFrameDesc[2];
+/////////////////////////////////////////////////////////////////////////////////////////
+#pragma endregion
+
+
+#pragma region // Lens distortion variables
+/////////////////////////////////////////////////////////////////////////////////////////
+struct VertexDataLens				// Vertex data for lens
+{
+	Vector2 position;
+	Vector2 texCoordRed;
+	Vector2 texCoordGreen;
+	Vector2 texCoordBlue;
+};
+
+GLuint		 m_unLensProgramID;
+GLuint		 m_unLensVAO;
+GLuint		 m_glIDVertBuffer;
+GLuint		 m_glIDIndexBuffer;
+unsigned int m_uiIndexSize;
+/////////////////////////////////////////////////////////////////////////////////////////
+#pragma endregion
+
+
+const int	numEyes = 2;
+uint32_t	framebufferWidth = 1280;
+uint32_t	framebufferHeight = 720;
+GLuint		framebuffer[numEyes];
+GLuint		colorRenderTarget[numEyes];
+GLuint		depthRenderTarget[numEyes];
+			
+							   // position	     // color
+float	TriangleVertexs[] = {  0.0,  0.5, 0.0,   1.0f, 0.0f, 0.0f,
+							   0.5, -0.5, 0.0,   0.0f, 1.0f, 0.0f,
+							  -0.5, -0.5, 0.0,   0.0f, 0.0f, 1.0f };
+
+void Init();
+GLFWwindow		*	initOpenGL(int width, int height, const std::string& title);
+vr::IVRSystem	*	initOpenVR(uint32_t& hmdWidth, uint32_t& hmdHeight);
+std::string getHMDString(vr::IVRSystem* pHmd, vr::TrackedDeviceIndex_t unDevice, 
+						 vr::TrackedDeviceProperty prop, 
+						 vr::TrackedPropertyError* peError = nullptr);
+GLuint CreateShaderProgram(const GLchar * VertexShader, const GLchar * FragmentShader);
+void WriteProjectionMatrixFile(char * Filename, vr::HmdMatrix44_t ProjMat);
+void CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc &BufferDesc);
+void SetupDistortion();
+void RenderDistortion();
+
+// Shaders
+const GLchar* vertexShaderSource = "#version 410 core\n"
+								   "layout (location = 0) in vec3 position;\n"
+								   "layout (location = 1) in vec3 color;\n"
+								   "out vec3 ourColor;\n"
+								   "void main()\n"
+								   "{\n"
+								   "gl_Position = vec4(position, 1.0);\n"
+								   "ourColor = color;\n"
+								   "}\0";
+const GLchar* fragmentShaderSource = "#version 410 core\n"
+									 "in vec3 ourColor;\n"
+									 "out vec4 color;\n"
+									 "void main()\n"
+									 "{\n"
+									 "color = vec4(ourColor, 1.0f);\n"
+									 "}\n\0";
 
 void main()
 {
-	const int numEyes = 2;
-	uint32_t framebufferWidth = 1280, framebufferHeight = 720;
+	Init();
+
+	GLuint VertexBufferID = 0;  // Vertex Buffer Object (VBO)
+	GLuint VAOID;
+	glGenVertexArrays(1, &VAOID);
+	glGenBuffers(1, &VertexBufferID);
+	// Bind the Vertex Array Object first, then bind and set vertex buffer(s) and attribute pointer(s).
+	glBindVertexArray(VAOID);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VertexBufferID);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(TriangleVertexs), TriangleVertexs, GL_STATIC_DRAW);
+
+	// Position attribute
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)0);
+	glEnableVertexAttribArray(0);
+	// Color attribute
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(1);
+
+	glBindVertexArray(0); // Unbind VAO
+
+	GLuint ShaderProgramID = CreateShaderProgram(vertexShaderSource, fragmentShaderSource);
+
+	while (!glfwWindowShouldClose(window))
+	{
+		vr::TrackedDevicePose_t trackedDevicePose[vr::k_unMaxTrackedDeviceCount];
+		vr::VRCompositor()->WaitGetPoses(trackedDevicePose, vr::k_unMaxTrackedDeviceCount, nullptr, 0);
+
+		for (int eye = 0; eye < numEyes; ++eye)
+		{
+			glBindFramebuffer(GL_FRAMEBUFFER, framebuffer[eye]);
+			glViewport(0, 0, framebufferWidth, framebufferHeight);
+
+			glClearColor(0.1f, 0.5f, 0.3f, 0.0f);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+			glUseProgram(ShaderProgramID);
+			glBindVertexArray(VAOID);
+			glDrawArrays(GL_TRIANGLES, 0, 3);
+			glBindVertexArray(0);
+
+			vr::Texture_t tex = { reinterpret_cast<void*>(intptr_t(colorRenderTarget[eye])), vr::API_OpenGL, vr::ColorSpace_Gamma };
+			vr::VRCompositor()->Submit(vr::EVREye(eye), &tex);
+		}
+
+		// Mirror to the window
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, GL_NONE);
+		glViewport(0, 0, 640, 720);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glBlitFramebuffer(0, 0, framebufferWidth, framebufferHeight, 0, 0, 640, 720, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, GL_NONE);
+
+		vr::VRCompositor()->PostPresentHandoff();
+
+		glfwSwapBuffers(window);
+		glfwPollEvents();	// This function processes only those events that are already 
+							// in the event queue and then returns immediately
+	}
+
+	// Properly de-allocate all resources once they've outlived their purpose
+	glDeleteVertexArrays(1, &VAOID);
+	glDeleteBuffers(1, &VertexBufferID);
+
+	glfwDestroyWindow(window);
+	glfwTerminate();
+
+	system("pause");
+}
+
+void Init()
+{
+	hmd = initOpenVR(framebufferWidth, framebufferHeight);
+	assert(hmd);
 
 	const int windowHeight = 720;
 	const int windowWidth = (framebufferWidth * windowHeight) / framebufferHeight;
 
 	window = initOpenGL(windowWidth, windowHeight, "minimalOpenGL");
 
-	GLuint framebuffer[numEyes];
-	glGenFramebuffers(numEyes, framebuffer);
+	
+	glGenFramebuffers(numEyes, framebuffer);								// create frame buffers for each eyes.
 
+	glGenTextures(numEyes, colorRenderTarget);								// prepare texture memory space and give it an index
+																			// In this case, glGenTextures creates two textures for colorRenderTarget
+																			// and define them by index 1 and 2.
+	glGenTextures(numEyes, depthRenderTarget);								// textures of depthRenderTarget are 3 and 4.
 
+	for (int eye = 0; eye < numEyes; ++eye) {
+		glBindTexture(GL_TEXTURE_2D, colorRenderTarget[eye]);				//Bind which texture if active for processing
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, framebufferWidth, framebufferHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
-	system("pause");
+		glBindTexture(GL_TEXTURE_2D, depthRenderTarget[eye]);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, framebufferWidth, framebufferHeight, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
+
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer[eye]);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorRenderTarget[eye], 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthRenderTarget[eye], 0);
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	const vr::HmdMatrix44_t& ltProj = hmd->GetProjectionMatrix(vr::Eye_Left, -nearPlaneZ, -farPlaneZ, vr::API_OpenGL);
+	const vr::HmdMatrix44_t& rtProj = hmd->GetProjectionMatrix(vr::Eye_Right, -nearPlaneZ, -farPlaneZ, vr::API_OpenGL);
+
+	WriteProjectionMatrixFile("LeftProjectionMatrix.txt",  ltProj);
+	WriteProjectionMatrixFile("RightProjectionMatrix.txt", rtProj);
 }
 
 GLFWwindow* initOpenGL(int width, int height, const std::string& title) {
@@ -82,10 +270,282 @@ GLFWwindow* initOpenGL(int width, int height, const std::string& title) {
 	fprintf(stderr, "GPU: %s (OpenGL version %s)\n", glGetString(GL_RENDERER), glGetString(GL_VERSION));
 
 	// Bind a single global vertex array (done this way since OpenGL 3)
-	{ GLuint vao; glGenVertexArrays(1, &vao); glBindVertexArray(vao); }
+	GLuint vao; 
+	glGenVertexArrays(1, &vao); 
+	glBindVertexArray(vao);
 
 	// Check for errors
-	{ const GLenum error = glGetError(); assert(error == GL_NONE); }
+	const GLenum error = glGetError(); 
+	assert(error == GL_NONE);
 
 	return window;
+}
+
+vr::IVRSystem* initOpenVR(uint32_t& hmdWidth, uint32_t& hmdHeight) 
+{
+	vr::EVRInitError eError = vr::VRInitError_None;
+	vr::IVRSystem* hmd = vr::VR_Init(&eError, vr::VRApplication_Scene);
+
+	if (eError != vr::VRInitError_None) {
+		fprintf(stderr, "OpenVR Initialization Error: %s\n", vr::VR_GetVRInitErrorAsEnglishDescription(eError));
+		return nullptr;
+	}
+
+	const std::string& driver = getHMDString(hmd, vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_TrackingSystemName_String);		// Graphic card name
+	const std::string& model  = getHMDString(hmd, vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_ModelNumber_String);				// HMD device name
+	const std::string& serial = getHMDString(hmd, vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_SerialNumber_String);			// HMD device serial
+	const float freq = hmd->GetFloatTrackedDeviceProperty(vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_DisplayFrequency_Float);	// HMD FPS
+
+	//get the proper resolution of the hmd
+	hmd->GetRecommendedRenderTargetSize(&hmdWidth, &hmdHeight);
+
+	fprintf(stderr, "HMD: %s '%s' #%s (%d x %d @ %g Hz)\n", driver.c_str(), model.c_str(), serial.c_str(), hmdWidth, hmdHeight, freq);
+
+	// Initialize the compositor
+	vr::IVRCompositor* compositor = vr::VRCompositor();
+	if (!compositor) {
+		fprintf(stderr, "OpenVR Compositor initialization failed. See log file for details\n");
+		vr::VR_Shutdown();
+		assert("VR failed" && false);
+	}
+
+	return hmd;
+}
+
+std::string getHMDString(vr::IVRSystem * pHmd, vr::TrackedDeviceIndex_t unDevice, vr::TrackedDeviceProperty prop, vr::TrackedPropertyError * peError)
+{
+	uint32_t unRequiredBufferLen = pHmd->GetStringTrackedDeviceProperty(unDevice, prop, nullptr, 0, peError);
+	if (unRequiredBufferLen == 0) 
+	{
+		return "";
+	}
+
+	char* pchBuffer = new char[unRequiredBufferLen];
+	unRequiredBufferLen = pHmd->GetStringTrackedDeviceProperty(unDevice, prop, pchBuffer, unRequiredBufferLen, peError);
+	std::string sResult = pchBuffer;
+	delete[] pchBuffer;
+
+	return sResult;
+}
+
+GLuint CreateShaderProgram(const GLchar * VertexShader, const GLchar * FragmentShader)
+{
+	// Build and compile our shader program
+	// Vertex shader
+	GLuint vertexShaderID = glCreateShader(GL_VERTEX_SHADER);
+	glShaderSource(vertexShaderID, 1, &VertexShader, NULL);
+	glCompileShader(vertexShaderID);
+	// Check for compile time errors
+	/*GLint success;
+	GLchar infoLog[512];
+	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+	if (!success)
+	{
+	glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
+	std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
+	}*/
+	// Fragment shader
+	GLuint fragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
+	glShaderSource(fragmentShaderID, 1, &FragmentShader, NULL);
+	glCompileShader(fragmentShaderID);
+	// Check for compile time errors
+	/*glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+	if (!success)
+	{
+	glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
+	std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
+	}*/
+	// Link shaders
+	GLuint shaderProgramID = glCreateProgram();
+	glAttachShader(shaderProgramID, vertexShaderID);
+	glAttachShader(shaderProgramID, fragmentShaderID);
+	glLinkProgram(shaderProgramID);
+	// Check for linking errors
+	/*glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
+	if (!success) {
+	glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
+	std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
+	}*/
+	glDeleteShader(vertexShaderID);
+	glDeleteShader(fragmentShaderID);
+
+	return shaderProgramID;				// return create shader ID
+}
+
+void WriteProjectionMatrixFile(char * Filename, vr::HmdMatrix44_t ProjMat)
+{
+	fstream File;
+
+	File.open(Filename, ios::out);
+	for (int i = 0; i < 4; i++)
+	{
+		File << ProjMat.m[i][0] << " " << ProjMat.m[i][1] << " "
+			 << ProjMat.m[i][2] << " " << ProjMat.m[i][3] << "\n";
+	}
+	File.close();
+}
+
+void CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc & BufferDesc)
+{
+	//glGenBuffers();
+}
+
+void SetupDistortion()
+{
+	if (!hmd)
+		return;
+
+	GLushort m_iLensGridSegmentCountH = 43;
+	GLushort m_iLensGridSegmentCountV = 43;
+
+	float w = (float)(1.0 / float(m_iLensGridSegmentCountH - 1));
+	float h = (float)(1.0 / float(m_iLensGridSegmentCountV - 1));
+
+	float u, v = 0;
+
+	std::vector<VertexDataLens> vVerts(0);
+	VertexDataLens vert;
+
+	//left eye distortion verts
+	float Xoffset = -1;
+	for (int y = 0; y<m_iLensGridSegmentCountV; y++)
+	{
+		for (int x = 0; x<m_iLensGridSegmentCountH; x++)
+		{
+			u = x*w; v = 1 - y*h;
+			vert.position = Vector2(Xoffset + u, -1 + 2 * y*h);
+
+			vr::DistortionCoordinates_t dc0 = hmd->ComputeDistortion(vr::Eye_Left, u, v);
+
+			vert.texCoordRed   = Vector2(dc0.rfRed[0], 1 - dc0.rfRed[1]);
+			vert.texCoordGreen = Vector2(dc0.rfGreen[0], 1 - dc0.rfGreen[1]);
+			vert.texCoordBlue  = Vector2(dc0.rfBlue[0], 1 - dc0.rfBlue[1]);
+
+			vVerts.push_back(vert);
+		}
+	}
+
+	//right eye distortion verts
+	Xoffset = 0;
+	for (int y = 0; y<m_iLensGridSegmentCountV; y++)
+	{
+		for (int x = 0; x<m_iLensGridSegmentCountH; x++)
+		{
+			u = x*w; v = 1 - y*h;
+			vert.position = Vector2(Xoffset + u, -1 + 2 * y*h);
+
+			vr::DistortionCoordinates_t dc0 = hmd->ComputeDistortion(vr::Eye_Right, u, v);
+
+			vert.texCoordRed = Vector2(dc0.rfRed[0], 1 - dc0.rfRed[1]);
+			vert.texCoordGreen = Vector2(dc0.rfGreen[0], 1 - dc0.rfGreen[1]);
+			vert.texCoordBlue = Vector2(dc0.rfBlue[0], 1 - dc0.rfBlue[1]);
+
+			vVerts.push_back(vert);
+		}
+	}
+
+	std::vector<GLushort> vIndices;
+	GLushort a, b, c, d;
+
+	GLushort offset = 0;
+	for (GLushort y = 0; y<m_iLensGridSegmentCountV - 1; y++)
+	{
+		for (GLushort x = 0; x<m_iLensGridSegmentCountH - 1; x++)
+		{
+			a = m_iLensGridSegmentCountH*y + x + offset;
+			b = m_iLensGridSegmentCountH*y + x + 1 + offset;
+			c = (y + 1)*m_iLensGridSegmentCountH + x + 1 + offset;
+			d = (y + 1)*m_iLensGridSegmentCountH + x + offset;
+			vIndices.push_back(a);
+			vIndices.push_back(b);
+			vIndices.push_back(c);
+
+			vIndices.push_back(a);
+			vIndices.push_back(c);
+			vIndices.push_back(d);
+		}
+	}
+
+	offset = (m_iLensGridSegmentCountH)*(m_iLensGridSegmentCountV);
+	for (GLushort y = 0; y<m_iLensGridSegmentCountV - 1; y++)
+	{
+		for (GLushort x = 0; x<m_iLensGridSegmentCountH - 1; x++)
+		{
+			a = m_iLensGridSegmentCountH*y + x + offset;
+			b = m_iLensGridSegmentCountH*y + x + 1 + offset;
+			c = (y + 1)*m_iLensGridSegmentCountH + x + 1 + offset;
+			d = (y + 1)*m_iLensGridSegmentCountH + x + offset;
+			vIndices.push_back(a);
+			vIndices.push_back(b);
+			vIndices.push_back(c);
+
+			vIndices.push_back(a);
+			vIndices.push_back(c);
+			vIndices.push_back(d);
+		}
+	}
+	m_uiIndexSize = vIndices.size();
+
+	glGenVertexArrays(1, &m_unLensVAO);
+	glBindVertexArray(m_unLensVAO);
+
+	glGenBuffers(1, &m_glIDVertBuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, m_glIDVertBuffer);
+	glBufferData(GL_ARRAY_BUFFER, vVerts.size() * sizeof(VertexDataLens), &vVerts[0], GL_STATIC_DRAW);
+
+	glGenBuffers(1, &m_glIDIndexBuffer);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_glIDIndexBuffer);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, vIndices.size() * sizeof(GLushort), &vIndices[0], GL_STATIC_DRAW);
+
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(VertexDataLens), (void *)offsetof(VertexDataLens, position));
+
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(VertexDataLens), (void *)offsetof(VertexDataLens, texCoordRed));
+
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(VertexDataLens), (void *)offsetof(VertexDataLens, texCoordGreen));
+
+	glEnableVertexAttribArray(3);
+	glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(VertexDataLens), (void *)offsetof(VertexDataLens, texCoordBlue));
+
+	glBindVertexArray(0);
+
+	glDisableVertexAttribArray(0);
+	glDisableVertexAttribArray(1);
+	glDisableVertexAttribArray(2);
+	glDisableVertexAttribArray(3);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+}
+
+void RenderDistortion()
+{
+	/*
+	glDisable(GL_DEPTH_TEST);
+	glViewport(0, 0, m_nWindowWidth, m_nWindowHeight);
+
+	glBindVertexArray(m_unLensVAO);
+	glUseProgram(m_unLensProgramID);
+
+	//render left lens (first half of index array )
+	glBindTexture(GL_TEXTURE_2D, leftEyeDesc.m_nResolveTextureId);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glDrawElements(GL_TRIANGLES, m_uiIndexSize / 2, GL_UNSIGNED_SHORT, 0);
+
+	//render right lens (second half of index array )
+	glBindTexture(GL_TEXTURE_2D, rightEyeDesc.m_nResolveTextureId);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glDrawElements(GL_TRIANGLES, m_uiIndexSize / 2, GL_UNSIGNED_SHORT, (const void *)(m_uiIndexSize));
+
+	glBindVertexArray(0);
+	glUseProgram(0);
+	*/
 }
