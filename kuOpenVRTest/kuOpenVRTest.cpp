@@ -21,6 +21,9 @@
 
 //#define _VR
 
+
+#define	numEyes 2
+
 #define Left  0
 #define Right 1
 
@@ -28,8 +31,6 @@
 #define farPlaneZ  100
 
 using namespace std;
-
-
 
 GLFWwindow		*	window = nullptr;
 vr::IVRSystem	*	hmd    = nullptr;
@@ -43,9 +44,21 @@ struct FrameBufferDesc
 	GLuint	DistortedTextureId;
 	GLuint	DistortedFrameBufferId;
 };
+
 FrameBufferDesc	EyeFrameDesc[2];
 /////////////////////////////////////////////////////////////////////////////////////////
 #pragma endregion
+
+uint32_t	framebufferWidth = 1280;
+uint32_t	framebufferHeight = 720;
+int			windowWidth = 1280;
+int			windowHeight = 720;
+
+GLuint		FrameBufferID[numEyes];
+GLuint		SceneTextureID[numEyes];
+GLuint		DistortedFrameBufferId[numEyes];
+GLuint		DistortedTexutreId[numEyes];
+GLuint		depthRenderTarget[numEyes];
 
 
 #pragma region // Lens distortion variables
@@ -58,7 +71,6 @@ struct VertexDataLens				// Vertex data for lens
 	Vector2 texCoordBlue;
 };
 
-GLuint		 m_unLensProgramID;
 GLuint		 m_unLensVAO;
 GLuint		 m_glIDVertBuffer;
 GLuint		 m_glIDIndexBuffer;
@@ -66,13 +78,6 @@ unsigned int m_uiIndexSize;
 /////////////////////////////////////////////////////////////////////////////////////////
 #pragma endregion
 
-
-const int	numEyes = 2;
-uint32_t	framebufferWidth = 1280;
-uint32_t	framebufferHeight = 720;
-GLuint		framebuffer[numEyes];
-GLuint		colorRenderTarget[numEyes];
-GLuint		depthRenderTarget[numEyes];
 			
 							   // position	     // color
 float	TriangleVertexs[] = {  0.0,  0.5, 0.0,   1.0f, 0.0f, 0.0f,
@@ -91,7 +96,11 @@ void CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc &Buffe
 void SetupDistortion();
 void RenderDistortion();
 
-// Shaders
+#pragma region /* Shaders */
+/////////////////////////////////////////////////////////////////////////////////////////
+GLuint		 LensProgramID;
+GLuint		 SceneProgramID;
+
 const GLchar* vertexShaderSource = "#version 410 core\n"
 								   "layout (location = 0) in vec3 position;\n"
 								   "layout (location = 1) in vec3 color;\n"
@@ -108,6 +117,41 @@ const GLchar* fragmentShaderSource = "#version 410 core\n"
 									 "{\n"
 									 "color = vec4(ourColor, 1.0f);\n"
 									 "}\n\0";
+const GLchar* DistortVertShaderSource = "#version 410 core\n"
+									    "layout(location = 0) in vec4 position;\n"
+									    "layout(location = 1) in vec2 v2UVredIn;\n"
+									    "layout(location = 2) in vec2 v2UVGreenIn;\n"
+									    "layout(location = 3) in vec2 v2UVblueIn;\n"
+									    "noperspective  out vec2 v2UVred;\n"
+									    "noperspective  out vec2 v2UVgreen;\n"
+									    "noperspective  out vec2 v2UVblue;\n"
+									    "void main()\n"
+										"{\n"
+										"	v2UVred = v2UVredIn;\n"
+										"	v2UVgreen = v2UVGreenIn;\n"
+										"	v2UVblue = v2UVblueIn;\n"
+										"	gl_Position = position;\n"
+										"}\n";
+const GLchar* DistortFragShaderSource = "#version 410 core\n"
+										"uniform sampler2D mytexture;\n"
+										"noperspective  in vec2 v2UVred;\n"
+										"noperspective  in vec2 v2UVgreen;\n"
+										"noperspective  in vec2 v2UVblue;\n"
+										"out vec4 outputColor;\n"
+										"void main()\n"
+										"{\n"
+										"	float fBoundsCheck = ( (dot( vec2( lessThan( v2UVgreen.xy, vec2(0.05, 0.05)) ), vec2(1.0, 1.0))+dot( vec2( greaterThan( v2UVgreen.xy, vec2( 0.95, 0.95)) ), vec2(1.0, 1.0))) );\n"
+										"	if( fBoundsCheck > 1.0 )\n"
+										"	{ outputColor = vec4( 0, 0, 0, 1.0 ); }\n"
+										"	else\n"
+										"	{\n"
+										"		float red = texture(mytexture, v2UVred).x;\n"
+										"		float green = texture(mytexture, v2UVgreen).y;\n"
+										"		float blue = texture(mytexture, v2UVblue).z;\n"
+										"		outputColor = vec4( red, green, blue, 1.0  ); }\n"
+										"}\n";
+/////////////////////////////////////////////////////////////////////////////////////////
+#pragma endregion
 
 void main()
 {
@@ -132,7 +176,8 @@ void main()
 
 	glBindVertexArray(0); // Unbind VAO
 
-	GLuint ShaderProgramID = CreateShaderProgram(vertexShaderSource, fragmentShaderSource);
+	SceneProgramID = CreateShaderProgram(vertexShaderSource, fragmentShaderSource);
+	LensProgramID = CreateShaderProgram(DistortVertShaderSource, DistortFragShaderSource);
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -141,20 +186,28 @@ void main()
 
 		for (int eye = 0; eye < numEyes; ++eye)
 		{
-			glBindFramebuffer(GL_FRAMEBUFFER, framebuffer[eye]);
+			glBindFramebuffer(GL_FRAMEBUFFER, FrameBufferID[eye]);
 			glViewport(0, 0, framebufferWidth, framebufferHeight);
 
 			glClearColor(0.1f, 0.5f, 0.3f, 0.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-			glUseProgram(ShaderProgramID);
+			glUseProgram(SceneProgramID);
 			glBindVertexArray(VAOID);
 			glDrawArrays(GL_TRIANGLES, 0, 3);
 			glBindVertexArray(0);
 
-			vr::Texture_t tex = { reinterpret_cast<void*>(intptr_t(colorRenderTarget[eye])), vr::API_OpenGL, vr::ColorSpace_Gamma };
-			vr::VRCompositor()->Submit(vr::EVREye(eye), &tex);
+			glUseProgram(0);
+
+			//glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
+
+		//RenderDistortion();
+
+		vr::Texture_t LTexture = { reinterpret_cast<void*>(intptr_t(SceneTextureID[Left])), vr::API_OpenGL, vr::ColorSpace_Gamma };
+		vr::VRCompositor()->Submit(vr::EVREye(Left), &LTexture);
+		vr::Texture_t RTesture = { reinterpret_cast<void*>(intptr_t(SceneTextureID[Right])), vr::API_OpenGL, vr::ColorSpace_Gamma };
+		vr::VRCompositor()->Submit(vr::EVREye(Right), &RTesture);
 
 		// Mirror to the window
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, GL_NONE);
@@ -191,32 +244,47 @@ void Init()
 	window = initOpenGL(windowWidth, windowHeight, "minimalOpenGL");
 
 	
-	glGenFramebuffers(numEyes, framebuffer);								// create frame buffers for each eyes.
+	glGenFramebuffers(numEyes, FrameBufferID);							// create frame buffers for each eyes.
 
-	glGenTextures(numEyes, colorRenderTarget);								// prepare texture memory space and give it an index
-																			// In this case, glGenTextures creates two textures for colorRenderTarget
-																			// and define them by index 1 and 2.
-	glGenTextures(numEyes, depthRenderTarget);								// textures of depthRenderTarget are 3 and 4.
+	glGenTextures(numEyes, SceneTextureID);								// prepare texture memory space and give it an index
+																		// In this case, glGenTextures creates two textures for colorRenderTarget
+																		// and define them by index 1 and 2.
+	glGenTextures(numEyes, depthRenderTarget);							// textures of depthRenderTarget are 3 and 4.
 
-	for (int eye = 0; eye < numEyes; ++eye) {
-		glBindTexture(GL_TEXTURE_2D, colorRenderTarget[eye]);				//Bind which texture if active for processing
+	glGenFramebuffers(numEyes, DistortedFrameBufferId);
+
+	glGenTextures(numEyes, DistortedTexutreId);
+	
+	for (int eye = 0; eye < numEyes; ++eye) 
+	{
+		glBindTexture(GL_TEXTURE_2D, SceneTextureID[eye]);				//Bind which texture if active for processing
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, framebufferWidth, framebufferHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+		
+		//glBindTexture(GL_TEXTURE_2D, depthRenderTarget[eye]);
+		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		//glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, framebufferWidth, framebufferHeight, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
 
-		glBindTexture(GL_TEXTURE_2D, depthRenderTarget[eye]);
+		glBindFramebuffer(GL_FRAMEBUFFER, FrameBufferID[eye]);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, SceneTextureID[eye], 0);
+		//glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthRenderTarget[eye], 0);
+
+		
+		glBindTexture(GL_TEXTURE_2D, DistortedTexutreId[eye]);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, framebufferWidth, framebufferHeight, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
-
-		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer[eye]);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorRenderTarget[eye], 0);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthRenderTarget[eye], 0);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, framebufferWidth, framebufferHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+		
+		glBindFramebuffer(GL_FRAMEBUFFER, DistortedFrameBufferId[eye]);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, DistortedTexutreId[eye], 0);
 	}
+
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	const vr::HmdMatrix44_t& ltProj = hmd->GetProjectionMatrix(vr::Eye_Left, -nearPlaneZ, -farPlaneZ, vr::API_OpenGL);
@@ -224,6 +292,8 @@ void Init()
 
 	WriteProjectionMatrixFile("LeftProjectionMatrix.txt",  ltProj);
 	WriteProjectionMatrixFile("RightProjectionMatrix.txt", rtProj);
+
+	SetupDistortion();
 }
 
 GLFWwindow* initOpenGL(int width, int height, const std::string& title) {
@@ -522,15 +592,14 @@ void SetupDistortion()
 
 void RenderDistortion()
 {
-	/*
 	glDisable(GL_DEPTH_TEST);
-	glViewport(0, 0, m_nWindowWidth, m_nWindowHeight);
+	glViewport(0, 0, windowWidth, windowHeight);
 
 	glBindVertexArray(m_unLensVAO);
-	glUseProgram(m_unLensProgramID);
+	glUseProgram(LensProgramID);
 
 	//render left lens (first half of index array )
-	glBindTexture(GL_TEXTURE_2D, leftEyeDesc.m_nResolveTextureId);
+	glBindTexture(GL_TEXTURE_2D, DistortedTexutreId[Left]);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -538,7 +607,7 @@ void RenderDistortion()
 	glDrawElements(GL_TRIANGLES, m_uiIndexSize / 2, GL_UNSIGNED_SHORT, 0);
 
 	//render right lens (second half of index array )
-	glBindTexture(GL_TEXTURE_2D, rightEyeDesc.m_nResolveTextureId);
+	glBindTexture(GL_TEXTURE_2D, DistortedTexutreId[Right]);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -547,5 +616,4 @@ void RenderDistortion()
 
 	glBindVertexArray(0);
 	glUseProgram(0);
-	*/
 }
