@@ -114,8 +114,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="kuOpenVRTest.cpp" />
+    <ClCompile Include="Matrices.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Matrices.h" />
     <ClInclude Include="Vectors.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

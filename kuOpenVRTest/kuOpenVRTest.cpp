@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "vectors.h"
+#include "Matrices.h"
 
 #ifdef _DEBUG
 #pragma comment(lib, "opengl32")
@@ -60,9 +61,9 @@ GLuint		DistortedFrameBufferId[numEyes];
 GLuint		DistortedTexutreId[numEyes];
 GLuint		depthRenderTarget[numEyes];
 
-
-vr::HmdMatrix44_t	ProjectionMat[2];
-vr::HmdMatrix34_t	EyePoseMat[2];
+Matrix4 ProjectionMat[2];
+Matrix4 EyePoseMat[2];
+Matrix4 MVPMat[2];
 
 
 #pragma region // Lens distortion variables
@@ -82,7 +83,8 @@ unsigned int m_uiIndexSize;
 /////////////////////////////////////////////////////////////////////////////////////////
 #pragma endregion
 
-			
+GLuint SceneMatrixLocation;
+
 							   // position	     // color
 float	TriangleVertexs[] = {  0.0,  0.5, 0.0,   1.0f, 0.0f, 0.0f,
 							   0.5, -0.5, 0.0,   0.0f, 1.0f, 0.0f,
@@ -95,24 +97,32 @@ std::string getHMDString(vr::IVRSystem* pHmd, vr::TrackedDeviceIndex_t unDevice,
 						 vr::TrackedDeviceProperty prop, 
 						 vr::TrackedPropertyError* peError = nullptr);
 GLuint CreateShaderProgram(const GLchar * VertexShader, const GLchar * FragmentShader);
+
+Matrix4 GetHMDMatrixProjectionEye(vr::Hmd_Eye nEye);
+Matrix4 GetHMDMatrixPoseEye(vr::Hmd_Eye nEye);
+
 void WriteProjectionMatrixFile(char * Filename, vr::HmdMatrix44_t ProjMat);
 void WriteEyePoseMatrixFile(char * Filename, vr::HmdMatrix34_t PoseMat);
+void WriteMVPMatrixFile(char * Filename, Matrix4 matMVP);
+void SetMatrix(vr::HmdMatrix44_t HMDProjMat, Matrix4& ProjMat);
+void SetMatrix(vr::HmdMatrix34_t HMDEyePoseMat, Matrix4& PoseMat);
 void CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc &BufferDesc);
 void SetupDistortion();
 void RenderDistortion();
 
 #pragma region /* Shaders */
 /////////////////////////////////////////////////////////////////////////////////////////
-GLuint		 LensProgramID;
 GLuint		 SceneProgramID;
+GLuint		 LensProgramID;
 
 const GLchar* vertexShaderSource = "#version 410 core\n"
+								   "uniform mat4 matrix;\n"
 								   "layout (location = 0) in vec3 position;\n"
 								   "layout (location = 1) in vec3 color;\n"
 								   "out vec3 ourColor;\n"
 								   "void main()\n"
 								   "{\n"
-								   "gl_Position = vec4(position, 1.0);\n"
+								   "gl_Position = matrix * vec4(position, 1.0);\n"
 								   "ourColor = color;\n"
 								   "}\0";
 const GLchar* fragmentShaderSource = "#version 410 core\n"
@@ -182,6 +192,8 @@ void main()
 	glBindVertexArray(0); // Unbind VAO
 
 	SceneProgramID = CreateShaderProgram(vertexShaderSource, fragmentShaderSource);
+	SceneMatrixLocation = glGetUniformLocation(SceneProgramID, "matrix");
+
 	LensProgramID = CreateShaderProgram(DistortVertShaderSource, DistortFragShaderSource);
 
 	while (!glfwWindowShouldClose(window))
@@ -198,6 +210,7 @@ void main()
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 			glUseProgram(SceneProgramID);
+			glUniformMatrix4fv(SceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
 			glBindVertexArray(VAOID);
 			glDrawArrays(GL_TRIANGLES, 0, 3);
 			glBindVertexArray(0);
@@ -292,17 +305,21 @@ void Init()
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	ProjectionMat[Left]  = hmd->GetProjectionMatrix(vr::Eye_Left, -nearPlaneZ, -farPlaneZ, vr::API_OpenGL);
-	ProjectionMat[Right] = hmd->GetProjectionMatrix(vr::Eye_Right, -nearPlaneZ, -farPlaneZ, vr::API_OpenGL);
-	
-	EyePoseMat[Left] = hmd->GetEyeToHeadTransform(vr::Eye_Left);
-	EyePoseMat[Right] = hmd->GetEyeToHeadTransform(vr::Eye_Right);
+	vr::HmdMatrix44_t	ProjMat[2];
+	vr::HmdMatrix34_t	PoseMat[2];
 
-	WriteProjectionMatrixFile("LeftProjectionMatrix.txt", ProjectionMat[Left]);
-	WriteProjectionMatrixFile("RightProjectionMatrix.txt", ProjectionMat[Right]);
+	ProjectionMat[Left] = GetHMDMatrixProjectionEye(vr::Eye_Left);
+	ProjectionMat[Right] = GetHMDMatrixProjectionEye(vr::Eye_Right);
 
-	WriteEyePoseMatrixFile("LeftPoseMatrix.txt", EyePoseMat[Left]);
-	WriteEyePoseMatrixFile("RightPoseMatrix.txt", EyePoseMat[Right]);
+	EyePoseMat[Left] = GetHMDMatrixPoseEye(vr::Eye_Left);
+	EyePoseMat[Right] = GetHMDMatrixPoseEye(vr::Eye_Right);
+
+
+	MVPMat[Left]  = /*ProjectionMat[Left] * */EyePoseMat[Left];
+	MVPMat[Right] = /*ProjectionMat[Right] * */EyePoseMat[Right];
+
+	WriteMVPMatrixFile("LeftMVPMatrix.txt", MVPMat[Left]);
+	WriteMVPMatrixFile("RightMVPMatrix.txt", MVPMat[Right]);
 
 	SetupDistortion();
 }
@@ -436,6 +453,7 @@ GLuint CreateShaderProgram(const GLchar * VertexShader, const GLchar * FragmentS
 	glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
 	std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
 	}*/
+
 	// Link shaders
 	GLuint shaderProgramID = glCreateProgram();
 	glAttachShader(shaderProgramID, vertexShaderID);
@@ -451,6 +469,56 @@ GLuint CreateShaderProgram(const GLchar * VertexShader, const GLchar * FragmentS
 	glDeleteShader(fragmentShaderID);
 
 	return shaderProgramID;				// return create shader ID
+}
+
+Matrix4 GetHMDMatrixProjectionEye(vr::Hmd_Eye nEye)
+{
+	if (!hmd)
+		return Matrix4();
+
+	vr::HmdMatrix44_t mat = hmd->GetProjectionMatrix(nEye, nearPlaneZ, farPlaneZ, vr::API_OpenGL);
+
+	if (nEye == vr::Eye_Left)
+	{
+		WriteProjectionMatrixFile("LeftProjectionMatrix.txt", mat);
+	}
+	else
+	{
+		WriteProjectionMatrixFile("RightProjectionMatrix.txt", mat);
+	}
+
+	return Matrix4(
+		mat.m[0][0], mat.m[1][0], mat.m[2][0], mat.m[3][0],
+		mat.m[0][1], mat.m[1][1], mat.m[2][1], mat.m[3][1],
+		mat.m[0][2], mat.m[1][2], mat.m[2][2], mat.m[3][2],
+		mat.m[0][3], mat.m[1][3], mat.m[2][3], mat.m[3][3]
+	);
+}
+
+Matrix4 GetHMDMatrixPoseEye(vr::Hmd_Eye nEye)
+{
+	if (!hmd)
+		return Matrix4();
+
+	vr::HmdMatrix34_t matEyeRight = hmd->GetEyeToHeadTransform(nEye);
+
+	if (nEye == vr::Eye_Left)
+	{
+		WriteEyePoseMatrixFile("LeftPoseMatrix.txt", matEyeRight);
+	}
+	else
+	{
+		WriteEyePoseMatrixFile("RightPoseMatrix.txt", matEyeRight);
+	}
+
+	Matrix4 matrixObj(
+		matEyeRight.m[0][0], matEyeRight.m[1][0], matEyeRight.m[2][0], 0.0,
+		matEyeRight.m[0][1], matEyeRight.m[1][1], matEyeRight.m[2][1], 0.0,
+		matEyeRight.m[0][2], matEyeRight.m[1][2], matEyeRight.m[2][2], 0.0,
+		matEyeRight.m[0][3], matEyeRight.m[1][3], matEyeRight.m[2][3], 1.0f
+	);
+
+	return matrixObj.invert();
 }
 
 void WriteProjectionMatrixFile(char * Filename, vr::HmdMatrix44_t ProjMat)
@@ -477,6 +545,46 @@ void WriteEyePoseMatrixFile(char * Filename, vr::HmdMatrix34_t PoseMat)
 			 << PoseMat.m[i][2] << " " << PoseMat.m[i][3] << "\n";
 	}
 	File.close();
+}
+
+void WriteMVPMatrixFile(char * Filename, Matrix4 matMVP)
+{
+	fstream File;
+
+	File.open(Filename, ios::out);
+	for (int i = 0; i < 4; i++)
+	{
+		File << matMVP.m[4 * i] << " " << matMVP.m[4 * i + 1] << " "
+			 << matMVP.m[4 * i + 2] << " " << matMVP.m[4 * i + 3] << "\n";
+	}
+	File.close();
+}
+
+void SetMatrix(vr::HmdMatrix44_t HMDProjMat, Matrix4 & ProjMat)
+{
+	for (int i = 0; i < 4; i++)
+	{
+		for (int j = 0; j < 4; j++)
+		{
+			ProjMat.m[4 * i + j] = HMDProjMat.m[i][j];
+		}
+	}
+}
+
+void SetMatrix(vr::HmdMatrix34_t HMDEyePoseMat, Matrix4 & PoseMat)
+{
+	for (int i = 0; i < 3; i++)
+	{
+		for (int j = 0; j < 4; j++)
+		{
+			PoseMat.m[4 * i+j] = HMDEyePoseMat.m[i][j];
+		}	
+	}
+
+	PoseMat.m[12] = 0.0f;
+	PoseMat.m[13] = 0.0f;
+	PoseMat.m[14] = 0.0f;
+	PoseMat.m[15] = 1.0f;
 }
 
 void CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc & BufferDesc)
