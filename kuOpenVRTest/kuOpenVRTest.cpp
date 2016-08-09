@@ -61,6 +61,10 @@ GLuint		DistortedTexutreId[numEyes];
 GLuint		depthRenderTarget[numEyes];
 
 
+vr::HmdMatrix44_t	ProjectionMat[2];
+vr::HmdMatrix34_t	EyePoseMat[2];
+
+
 #pragma region // Lens distortion variables
 /////////////////////////////////////////////////////////////////////////////////////////
 struct VertexDataLens				// Vertex data for lens
@@ -92,6 +96,7 @@ std::string getHMDString(vr::IVRSystem* pHmd, vr::TrackedDeviceIndex_t unDevice,
 						 vr::TrackedPropertyError* peError = nullptr);
 GLuint CreateShaderProgram(const GLchar * VertexShader, const GLchar * FragmentShader);
 void WriteProjectionMatrixFile(char * Filename, vr::HmdMatrix44_t ProjMat);
+void WriteEyePoseMatrixFile(char * Filename, vr::HmdMatrix34_t PoseMat);
 void CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc &BufferDesc);
 void SetupDistortion();
 void RenderDistortion();
@@ -287,11 +292,17 @@ void Init()
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	const vr::HmdMatrix44_t& ltProj = hmd->GetProjectionMatrix(vr::Eye_Left, -nearPlaneZ, -farPlaneZ, vr::API_OpenGL);
-	const vr::HmdMatrix44_t& rtProj = hmd->GetProjectionMatrix(vr::Eye_Right, -nearPlaneZ, -farPlaneZ, vr::API_OpenGL);
+	ProjectionMat[Left]  = hmd->GetProjectionMatrix(vr::Eye_Left, -nearPlaneZ, -farPlaneZ, vr::API_OpenGL);
+	ProjectionMat[Right] = hmd->GetProjectionMatrix(vr::Eye_Right, -nearPlaneZ, -farPlaneZ, vr::API_OpenGL);
+	
+	EyePoseMat[Left] = hmd->GetEyeToHeadTransform(vr::Eye_Left);
+	EyePoseMat[Right] = hmd->GetEyeToHeadTransform(vr::Eye_Right);
 
-	WriteProjectionMatrixFile("LeftProjectionMatrix.txt",  ltProj);
-	WriteProjectionMatrixFile("RightProjectionMatrix.txt", rtProj);
+	WriteProjectionMatrixFile("LeftProjectionMatrix.txt", ProjectionMat[Left]);
+	WriteProjectionMatrixFile("RightProjectionMatrix.txt", ProjectionMat[Right]);
+
+	WriteEyePoseMatrixFile("LeftPoseMatrix.txt", EyePoseMat[Left]);
+	WriteEyePoseMatrixFile("RightPoseMatrix.txt", EyePoseMat[Right]);
 
 	SetupDistortion();
 }
@@ -451,6 +462,19 @@ void WriteProjectionMatrixFile(char * Filename, vr::HmdMatrix44_t ProjMat)
 	{
 		File << ProjMat.m[i][0] << " " << ProjMat.m[i][1] << " "
 			 << ProjMat.m[i][2] << " " << ProjMat.m[i][3] << "\n";
+	}
+	File.close();
+}
+
+void WriteEyePoseMatrixFile(char * Filename, vr::HmdMatrix34_t PoseMat)
+{
+	fstream File;
+
+	File.open(Filename, ios::out);
+	for (int i = 0; i < 3; i++)
+	{
+		File << PoseMat.m[i][0] << " " << PoseMat.m[i][1] << " "
+			 << PoseMat.m[i][2] << " " << PoseMat.m[i][3] << "\n";
 	}
 	File.close();
 }
