@@ -61,9 +61,9 @@ GLuint		DistortedFrameBufferId[numEyes];
 GLuint		DistortedTexutreId[numEyes];
 GLuint		depthRenderTarget[numEyes];
 
-Matrix4 ProjectionMat[2];
-Matrix4 EyePoseMat[2];
-Matrix4 MVPMat[2];
+Matrix4		ProjectionMat[2];
+Matrix4		EyePoseMat[2];
+Matrix4		MVPMat[2];
 
 
 #pragma region // Lens distortion variables
@@ -83,7 +83,7 @@ unsigned int m_uiIndexSize;
 /////////////////////////////////////////////////////////////////////////////////////////
 #pragma endregion
 
-GLuint SceneMatrixLocation;
+GLuint	SceneMatrixLocation;
 
 							   // position	     // color
 float	TriangleVertexs[] = {  0.0,  0.5, 0.0,   1.0f, 0.0f, 0.0f,
@@ -96,7 +96,7 @@ vr::IVRSystem	*	initOpenVR(uint32_t& hmdWidth, uint32_t& hmdHeight);
 std::string getHMDString(vr::IVRSystem* pHmd, vr::TrackedDeviceIndex_t unDevice, 
 						 vr::TrackedDeviceProperty prop, 
 						 vr::TrackedPropertyError* peError = nullptr);
-GLuint CreateShaderProgram(const GLchar * VertexShader, const GLchar * FragmentShader);
+GLuint	CreateShaderProgram(const GLchar * VertexShader, const GLchar * FragmentShader);
 
 Matrix4 GetHMDMatrixProjectionEye(vr::Hmd_Eye nEye);
 Matrix4 GetHMDMatrixPoseEye(vr::Hmd_Eye nEye);
@@ -292,7 +292,6 @@ void Init()
 		glBindFramebuffer(GL_FRAMEBUFFER, FrameBufferID[eye]);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, SceneTextureID[eye], 0);
 		//glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthRenderTarget[eye], 0);
-
 		
 		glBindTexture(GL_TEXTURE_2D, DistortedTexutreId[eye]);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -315,16 +314,17 @@ void Init()
 	EyePoseMat[Right] = GetHMDMatrixPoseEye(vr::Eye_Right);
 
 
-	MVPMat[Left]  = /*ProjectionMat[Left] * */EyePoseMat[Left];
-	MVPMat[Right] = /*ProjectionMat[Right] * */EyePoseMat[Right];
+	MVPMat[Left]  = /*ProjectionMat[Left] * */  EyePoseMat[Left];
+	MVPMat[Right] = /*ProjectionMat[Right] * */ EyePoseMat[Right];
 
-	WriteMVPMatrixFile("LeftMVPMatrix.txt", MVPMat[Left]);
+	WriteMVPMatrixFile("LeftMVPMatrix.txt",  MVPMat[Left]);
 	WriteMVPMatrixFile("RightMVPMatrix.txt", MVPMat[Right]);
 
 	SetupDistortion();
 }
 
-GLFWwindow* initOpenGL(int width, int height, const std::string& title) {
+GLFWwindow* initOpenGL(int width, int height, const std::string& title) 
+{
 	if (!glfwInit()) {
 		fprintf(stderr, "ERROR: could not start GLFW\n");
 		::exit(1);
@@ -342,7 +342,8 @@ GLFWwindow* initOpenGL(int width, int height, const std::string& title) {
 #   endif
 
 	GLFWwindow* window = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
-	if (!window) {
+	if (!window) 
+	{
 		fprintf(stderr, "ERROR: could not open window with GLFW\n");
 		glfwTerminate();
 		::exit(2);
