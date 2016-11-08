@@ -28,15 +28,15 @@
 
 //#define _VR
 
-#define pi 3.1415926
+#define pi			3.1415926
 
-#define	numEyes 2
+#define	numEyes		2
 
-#define Left  0
-#define Right 1
+#define Left		0
+#define Right		1
 
-#define nearPlaneZ 0.1
-#define farPlaneZ  100
+#define nearPlaneZ	0.1
+#define farPlaneZ	100
 
 using namespace std;
 
@@ -93,10 +93,10 @@ unsigned int m_uiIndexSize;
 /////////////////////////////////////////////////////////////////////////////////////////
 #pragma endregion
 
-							   // position	       // color
-float	TriangleVertexs[] = {   0.0,  1.0f, 0.0,    1.0f, 0.0f, 0.0f,
-							    1.0f, -1.0f, 0.0,   0.0f, 1.0f, 0.0f,
-							   -1.0f, -1.0f, 0.0,   0.0f, 0.0f, 1.0f };
+							   // position	         // color
+float	TriangleVertexs[] = {   0.0f,  1.0f, 0.0f,   1.0f, 0.0f, 0.0f,
+							    1.0f, -1.0f, 0.0f,   0.0f, 1.0f, 0.0f,
+							   -1.0f, -1.0f, 0.0f,   0.0f, 0.0f, 1.0f };
 
 void Init();
 GLFWwindow		*	initOpenGL(int width, int height, const std::string& title);
@@ -116,7 +116,6 @@ void SetMatrix(vr::HmdMatrix34_t HMDEyePoseMat, Matrix4& PoseMat);
 void CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc &BufferDesc);
 void SetupDistortion();
 void RenderDistortion();
-
 
 void main()
 {
@@ -150,7 +149,7 @@ void main()
 	ProjMatLoc = glGetUniformLocation(SceneShaderHandler.ShaderProgramID, "ProjMat");
 	ViewMatLoc = glGetUniformLocation(SceneShaderHandler.ShaderProgramID, "ViewMat");
 
-	ProjMat = glm::perspective(45.0f, (GLfloat)640 / (GLfloat)480, 0.1f, 100.0f);
+	ProjMat = glm::perspective(45.0f, (GLfloat)640 / (GLfloat)480, (float)nearPlaneZ, (float)farPlaneZ);
 	ViewMat = glm::translate(ViewMat, glm::vec3(0.0f, 0.0f, -10.0f));
 	//ViewMat = glm::rotate(ViewMat, (GLfloat)pi * 60.0f / 180.0f,
 	//						glm::vec3(1.0, 1.0, 0.0)); // mat, degree, axis. (use radians)
