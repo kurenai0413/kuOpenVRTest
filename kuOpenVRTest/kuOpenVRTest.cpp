@@ -1,6 +1,10 @@
 #include <GLEW/glew.h>
 #include <GLEW/wglew.h>
 #include <GLFW/glfw3.h> 
+#include <GLM/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
 #include <OpenVR.h>
 
 #include <cstring>
@@ -22,6 +26,7 @@
 
 //#define _VR
 
+#define pi 3.1415926
 
 #define	numEyes 2
 
@@ -85,10 +90,10 @@ unsigned int m_uiIndexSize;
 
 GLuint	SceneMatrixLocation;
 
-							   // position	     // color
-float	TriangleVertexs[] = {  0.0,  0.5, 0.0,   1.0f, 0.0f, 0.0f,
-							   0.5, -0.5, 0.0,   0.0f, 1.0f, 0.0f,
-							  -0.5, -0.5, 0.0,   0.0f, 0.0f, 1.0f };
+							   // position	       // color
+float	TriangleVertexs[] = {   0.0,  1.0f, 0.0,   1.0f, 0.0f, 0.0f,
+							   1.0f, -1.0f, 0.0,   0.0f, 1.0f, 0.0f,
+							  -1.0f, -1.0f, 0.0,   0.0f, 0.0f, 1.0f };
 
 void Init();
 GLFWwindow		*	initOpenGL(int width, int height, const std::string& title);
@@ -117,12 +122,14 @@ GLuint		 LensProgramID;
 
 const GLchar* vertexShaderSource = "#version 410 core\n"
 								   "uniform mat4 matrix;\n"
+								   "uniform mat4 ViewMat;"
+								   "uniform mat4 ProjMat;"
 								   "layout (location = 0) in vec3 position;\n"
 								   "layout (location = 1) in vec3 color;\n"
 								   "out vec3 ourColor;\n"
 								   "void main()\n"
 								   "{\n"
-								   "gl_Position = matrix * vec4(position, 1.0);\n"
+								   "gl_Position = matrix * ProjMat * ViewMat * vec4(position, 1.0);\n"
 								   "ourColor = color;\n"
 								   "}\0";
 const GLchar* fragmentShaderSource = "#version 410 core\n"
@@ -196,6 +203,18 @@ void main()
 
 	LensProgramID = CreateShaderProgram(DistortVertShaderSource, DistortFragShaderSource);
 
+	GLuint		ProjMatLoc, ViewMatLoc;
+	glm::mat4	ProjMat, ViewMat;
+
+	ProjMat = glm::perspective(45.0f, (GLfloat)640 / (GLfloat)480, 0.1f, 100.0f);
+	ProjMatLoc = glGetUniformLocation(SceneProgramID, "ProjMat");
+	
+	ViewMat = glm::translate(ViewMat, glm::vec3(0.0f, 0.0f, -10.0f));
+	//ViewMat = glm::rotate(ViewMat, (GLfloat)pi * 60.0f / 180.0f,
+	//						glm::vec3(1.0, 1.0, 0.0)); // mat, degree, axis. (use radians)
+	ViewMatLoc = glGetUniformLocation(SceneProgramID, "ViewMat");
+	
+
 	while (!glfwWindowShouldClose(window))
 	{
 		vr::TrackedDevicePose_t trackedDevicePose[vr::k_unMaxTrackedDeviceCount];
@@ -211,6 +230,9 @@ void main()
 
 			glUseProgram(SceneProgramID);
 			glUniformMatrix4fv(SceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
+			glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
+			glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
+
 			glBindVertexArray(VAOID);
 			glDrawArrays(GL_TRIANGLES, 0, 3);
 			glBindVertexArray(0);
