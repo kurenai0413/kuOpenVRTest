@@ -44,6 +44,7 @@ GLFWwindow		*	window = nullptr;
 vr::IVRSystem	*	hmd    = nullptr;
 
 kuShaderHandler		SceneShaderHandler;
+kuShaderHandler		DistortShaderHandler;
 
 #pragma region // Frame Buffer Containers
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -92,8 +93,6 @@ unsigned int m_uiIndexSize;
 /////////////////////////////////////////////////////////////////////////////////////////
 #pragma endregion
 
-GLuint	SceneMatrixLocation;
-
 							   // position	       // color
 float	TriangleVertexs[] = {   0.0,  1.0f, 0.0,    1.0f, 0.0f, 0.0f,
 							    1.0f, -1.0f, 0.0,   0.0f, 1.0f, 0.0f,
@@ -105,7 +104,6 @@ vr::IVRSystem	*	initOpenVR(uint32_t& hmdWidth, uint32_t& hmdHeight);
 std::string getHMDString(vr::IVRSystem* pHmd, vr::TrackedDeviceIndex_t unDevice, 
 						 vr::TrackedDeviceProperty prop, 
 						 vr::TrackedPropertyError* peError = nullptr);
-GLuint	CreateShaderProgram(const GLchar * VertexShader, const GLchar * FragmentShader);
 
 Matrix4 GetHMDMatrixProjectionEye(vr::Hmd_Eye nEye);
 Matrix4 GetHMDMatrixPoseEye(vr::Hmd_Eye nEye);
@@ -119,45 +117,6 @@ void CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc &Buffe
 void SetupDistortion();
 void RenderDistortion();
 
-#pragma region /* Shaders */
-/////////////////////////////////////////////////////////////////////////////////////////
-GLuint		 LensProgramID;
-
-const GLchar* DistortVertShaderSource = "#version 410 core\n"
-									    "layout(location = 0) in vec4 position;\n"
-									    "layout(location = 1) in vec2 v2UVredIn;\n"
-									    "layout(location = 2) in vec2 v2UVGreenIn;\n"
-									    "layout(location = 3) in vec2 v2UVblueIn;\n"
-									    "noperspective  out vec2 v2UVred;\n"
-									    "noperspective  out vec2 v2UVgreen;\n"
-									    "noperspective  out vec2 v2UVblue;\n"
-									    "void main()\n"
-										"{\n"
-										"	v2UVred = v2UVredIn;\n"
-										"	v2UVgreen = v2UVGreenIn;\n"
-										"	v2UVblue = v2UVblueIn;\n"
-										"	gl_Position = position;\n"
-										"}\n";
-const GLchar* DistortFragShaderSource = "#version 410 core\n"
-										"uniform sampler2D mytexture;\n"
-										"noperspective  in vec2 v2UVred;\n"
-										"noperspective  in vec2 v2UVgreen;\n"
-										"noperspective  in vec2 v2UVblue;\n"
-										"out vec4 outputColor;\n"
-										"void main()\n"
-										"{\n"
-										"	float fBoundsCheck = ( (dot( vec2( lessThan( v2UVgreen.xy, vec2(0.05, 0.05)) ), vec2(1.0, 1.0))+dot( vec2( greaterThan( v2UVgreen.xy, vec2( 0.95, 0.95)) ), vec2(1.0, 1.0))) );\n"
-										"	if( fBoundsCheck > 1.0 )\n"
-										"	{ outputColor = vec4( 0, 0, 0, 1.0 ); }\n"
-										"	else\n"
-										"	{\n"
-										"		float red = texture(mytexture, v2UVred).x;\n"
-										"		float green = texture(mytexture, v2UVgreen).y;\n"
-										"		float blue = texture(mytexture, v2UVblue).z;\n"
-										"		outputColor = vec4( red, green, blue, 1.0  ); }\n"
-										"}\n";
-/////////////////////////////////////////////////////////////////////////////////////////
-#pragma endregion
 
 void main()
 {
@@ -182,27 +141,26 @@ void main()
 
 	glBindVertexArray(0); // Unbind VAO
 
-	
-	SceneMatrixLocation = glGetUniformLocation(SceneShaderHandler.ShaderProgramID, "matrix");
+	DistortShaderHandler.Load("DistortVertexShader.vert", "DistortFragmentShader.frag");
 
-	LensProgramID = CreateShaderProgram(DistortVertShaderSource, DistortFragShaderSource);
-
-	GLuint		ProjMatLoc, ViewMatLoc;
+	GLuint		ProjMatLoc, ViewMatLoc, SceneMatrixLocation;
 	glm::mat4	ProjMat, ViewMat;
 
-	ProjMat = glm::perspective(45.0f, (GLfloat)640 / (GLfloat)480, 0.1f, 100.0f);
+	SceneMatrixLocation = glGetUniformLocation(SceneShaderHandler.ShaderProgramID, "matrix");
 	ProjMatLoc = glGetUniformLocation(SceneShaderHandler.ShaderProgramID, "ProjMat");
-	
+	ViewMatLoc = glGetUniformLocation(SceneShaderHandler.ShaderProgramID, "ViewMat");
+
+	ProjMat = glm::perspective(45.0f, (GLfloat)640 / (GLfloat)480, 0.1f, 100.0f);
 	ViewMat = glm::translate(ViewMat, glm::vec3(0.0f, 0.0f, -10.0f));
 	//ViewMat = glm::rotate(ViewMat, (GLfloat)pi * 60.0f / 180.0f,
 	//						glm::vec3(1.0, 1.0, 0.0)); // mat, degree, axis. (use radians)
-	ViewMatLoc = glGetUniformLocation(SceneShaderHandler.ShaderProgramID, "ViewMat");
-	
 
 	while (!glfwWindowShouldClose(window))
 	{
 		vr::TrackedDevicePose_t trackedDevicePose[vr::k_unMaxTrackedDeviceCount];
 		vr::VRCompositor()->WaitGetPoses(trackedDevicePose, vr::k_unMaxTrackedDeviceCount, nullptr, 0);
+
+		RenderDistortion();
 
 		for (int eye = 0; eye < numEyes; ++eye)
 		{
@@ -222,11 +180,7 @@ void main()
 			glBindVertexArray(0);
 
 			glUseProgram(0);
-
-			//glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
-
-		//RenderDistortion();
 
 		vr::Texture_t LTexture = { reinterpret_cast<void*>(intptr_t(SceneTextureID[Left])), vr::API_OpenGL, vr::ColorSpace_Gamma };
 		vr::VRCompositor()->Submit(vr::EVREye(Left), &LTexture);
@@ -435,50 +389,6 @@ std::string getHMDString(vr::IVRSystem * pHmd, vr::TrackedDeviceIndex_t unDevice
 	return sResult;
 }
 
-GLuint CreateShaderProgram(const GLchar * VertexShader, const GLchar * FragmentShader)
-{
-	// Build and compile our shader program
-	// Vertex shader
-	GLuint vertexShaderID = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertexShaderID, 1, &VertexShader, NULL);
-	glCompileShader(vertexShaderID);
-	// Check for compile time errors
-	/*GLint success;
-	GLchar infoLog[512];
-	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-	if (!success)
-	{
-	glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-	std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
-	}*/
-	// Fragment shader
-	GLuint fragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragmentShaderID, 1, &FragmentShader, NULL);
-	glCompileShader(fragmentShaderID);
-	// Check for compile time errors
-	/*glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-	if (!success)
-	{
-	glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-	std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
-	}*/
-
-	// Link shaders
-	GLuint shaderProgramID = glCreateProgram();
-	glAttachShader(shaderProgramID, vertexShaderID);
-	glAttachShader(shaderProgramID, fragmentShaderID);
-	glLinkProgram(shaderProgramID);
-	// Check for linking errors
-	/*glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-	if (!success) {
-	glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-	std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
-	}*/
-	glDeleteShader(vertexShaderID);
-	glDeleteShader(fragmentShaderID);
-
-	return shaderProgramID;				// return create shader ID
-}
 
 Matrix4 GetHMDMatrixProjectionEye(vr::Hmd_Eye nEye)
 {
@@ -737,7 +647,7 @@ void RenderDistortion()
 	glViewport(0, 0, windowWidth, windowHeight);
 
 	glBindVertexArray(m_unLensVAO);
-	glUseProgram(LensProgramID);
+	DistortShaderHandler.Use();
 
 	//render left lens (first half of index array )
 	glBindTexture(GL_TEXTURE_2D, DistortedTexutreId[Left]);
