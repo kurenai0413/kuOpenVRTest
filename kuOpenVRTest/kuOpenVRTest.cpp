@@ -8,6 +8,7 @@
 #include "kuShaderHandler.h"
 
 #include <OpenVR.h>
+#include <opencv2/opencv.hpp>
 
 #include <cstring>
 #include <cassert>
@@ -39,6 +40,7 @@
 #define farPlaneZ	100
 
 using namespace std;
+using namespace cv;
 
 GLFWwindow		*	window = nullptr;
 vr::IVRSystem	*	hmd    = nullptr;
@@ -60,10 +62,10 @@ FrameBufferDesc	EyeFrameDesc[2];
 /////////////////////////////////////////////////////////////////////////////////////////
 #pragma endregion
 
-uint32_t	framebufferWidth = 1280;
+uint32_t	framebufferWidth  = 1280;
 uint32_t	framebufferHeight = 720;
-int			windowWidth = 1280;
-int			windowHeight = 720;
+int			windowWidth		  = 1280;
+int			windowHeight	  = 720;
 
 GLuint		FrameBufferID[numEyes];
 GLuint		SceneTextureID[numEyes];
@@ -72,9 +74,8 @@ GLuint		DistortedTexutreId[numEyes];
 GLuint		depthRenderTarget[numEyes];
 
 Matrix4		ProjectionMat[2];
-Matrix4		EyePoseMat[2];
+Matrix4		EyePoseMat[2];  
 Matrix4		MVPMat[2];
-
 
 #pragma region // Lens distortion variables
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -98,6 +99,73 @@ float	TriangleVertexs[] = {   0.0f,  1.0f, 0.0f,   1.0f, 0.0f, 0.0f,
 							    1.0f, -1.0f, 0.0f,   0.0f, 1.0f, 0.0f,
 							   -1.0f, -1.0f, 0.0f,   0.0f, 0.0f, 1.0f };
 
+
+const GLfloat	vertices[]
+= {
+	// Frontal Face
+	-0.5f,  0.5f,  0.5f,			// 0:  Top Left  
+	 0.5f,  0.5f,  0.5f,			// 1:  Top Right
+	 0.5f, -0.5f,  0.5f,			// 2:  Bottom Right
+	-0.5f, -0.5f,  0.5f,			// 3:  Bottom Left
+
+	// Right Face
+	-0.5f,  0.5f, -0.5f,			// 4:  Top Left
+	-0.5f,  0.5f,  0.5f,			// 5:  Top Right
+	-0.5f, -0.5f,  0.5f,			// 6:  Bottom Right
+	-0.5f, -0.5f, -0.5f,			// 7:  Bottom Left
+
+	// Back face
+	 0.5f,  0.5f, -0.5f,			// 8:  Top Left 
+	-0.5f,  0.5f, -0.5f,			// 9:  Top Right
+	-0.5f, -0.5f, -0.5f,			// 10: Bottom Right
+	 0.5f, -0.5f, -0.5f,			// 11: Bottom Left
+
+	// Left Face
+	0.5f,  0.5f,  0.5f,			    // 12: Top Left 
+	0.5f,  0.5f, -0.5f, 			// 13: Top Right
+	0.5f, -0.5f, -0.5f, 			// 14: Bottom Right
+	0.5f, -0.5f,  0.5f,  			// 15: Bottom Left
+
+	// Up Face
+	-0.5f,  0.5f, -0.5f,  		    // 16: Top Left 
+	 0.5f,  0.5f, -0.5f,  		    // 17: Top Right
+	 0.5f,  0.5f,  0.5f,  		    // 18: Bottom Right
+	-0.5f,  0.5f,  0.5f,  		    // 19: Bottom Left
+
+	// Down Face
+	-0.5f, -0.5f,  0.5f,			// 20: Top Left 
+	 0.5f, -0.5f,  0.5f,  			// 21: Top Right
+	 0.5f, -0.5f, -0.5f,    		// 22: Bottom Right
+	-0.5f, -0.5f, -0.5f  			// 23: Bottom Left
+};
+
+const GLfloat   texCoords[]
+= {
+	0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f,
+	0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f,
+	0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f,
+	0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f,
+	0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f,
+	0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f
+};
+
+const GLuint    indices[]
+= {
+	// Frontal 
+	0,  1,  3,	  1,  2,  3,
+	// Right
+	4,  5,  7,	  5,  6,  7,
+	// Back
+	8,  9, 11,	  9, 10, 11,
+	// Left
+	12, 13, 15,  13, 14, 15,
+	// Up
+	16, 17, 19,  17, 18, 19,
+	// Down 
+	20, 21, 23,  21, 22, 23
+};
+
+
 void Init();
 GLFWwindow		*	initOpenGL(int width, int height, const std::string& title);
 vr::IVRSystem	*	initOpenVR(uint32_t& hmdWidth, uint32_t& hmdHeight);
@@ -117,30 +185,51 @@ void CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc &Buffe
 void SetupDistortion();
 void RenderDistortion();
 
+GLuint	CreateTexturebyImage(char * filename);
+
 void main()
 {
 	Init();
 
-	GLuint VertexBufferID = 0;  // Vertex Buffer Object (VBO)
-	GLuint VAOID;
-	glGenVertexArrays(1, &VAOID);
-	glGenBuffers(1, &VertexBufferID);
+	GLuint VertexArray = 0;
+	glGenVertexArrays(1, &VertexArray);
+	GLuint VertexBuffer = 0;  // Vertex Buffer Object (VBO)
+	glGenBuffers(1, &VertexBuffer);
+	GLuint TexCoordBuffer = 0;
+	glGenBuffers(1, &TexCoordBuffer);
+	GLuint ElementBuffer = 0;				// Element Buffer Object (EBO)
+	glGenBuffers(1, &ElementBuffer);
+	
 	// Bind the Vertex Array Object first, then bind and set vertex buffer(s) and attribute pointer(s).
-	glBindVertexArray(VAOID);
-
-	glBindBuffer(GL_ARRAY_BUFFER, VertexBufferID);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(TriangleVertexs), TriangleVertexs, GL_STATIC_DRAW);
+	glBindVertexArray(VertexArray);
 
 	// Position attribute
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)0);
+	glBindBuffer(GL_ARRAY_BUFFER, VertexBuffer);
+	//glBufferData(GL_ARRAY_BUFFER, sizeof(TriangleVertexs), TriangleVertexs, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	//glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(0);
+
 	// Color attribute
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
+	//glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
+	//glEnableVertexAttribArray(1);
+
+	// TexCoord
+	glBindBuffer(GL_ARRAY_BUFFER, TexCoordBuffer);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(texCoords), texCoords, GL_STATIC_DRAW);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
 	glEnableVertexAttribArray(1);
 
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ElementBuffer);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
 	glBindVertexArray(0); // Unbind VAO
+	glBindVertexArray(0);
 
 	DistortShaderHandler.Load("DistortVertexShader.vert", "DistortFragmentShader.frag");
+
+	GLuint TextureID = CreateTexturebyImage("TexImage.jpg");
 
 	GLuint		ProjMatLoc, ViewMatLoc, SceneMatrixLocation;
 	glm::mat4	ProjMat, ViewMat;
@@ -150,32 +239,39 @@ void main()
 	ViewMatLoc = glGetUniformLocation(SceneShaderHandler.ShaderProgramID, "ViewMat");
 
 	ProjMat = glm::perspective(45.0f, (GLfloat)640 / (GLfloat)480, (float)nearPlaneZ, (float)farPlaneZ);
-	ViewMat = glm::translate(ViewMat, glm::vec3(0.0f, 0.0f, -10.0f));
-	//ViewMat = glm::rotate(ViewMat, (GLfloat)pi * 60.0f / 180.0f,
-	//						glm::vec3(1.0, 1.0, 0.0)); // mat, degree, axis. (use radians)
+
+
+	ViewMat = glm::translate(ViewMat, glm::vec3(0.0f, 0.0f, -3.0f));
+	ViewMat = glm::rotate(ViewMat, (GLfloat)pi * 90.0f / 180.0f,
+						  glm::vec3(1.0, 0.0, 1.0)); // mat, degree, axis. (use radians)
 
 	while (!glfwWindowShouldClose(window))
 	{
 		vr::TrackedDevicePose_t trackedDevicePose[vr::k_unMaxTrackedDeviceCount];
 		vr::VRCompositor()->WaitGetPoses(trackedDevicePose, vr::k_unMaxTrackedDeviceCount, nullptr, 0);
 
-		RenderDistortion();
+		//RenderDistortion();
 
 		for (int eye = 0; eye < numEyes; ++eye)
 		{
 			glBindFramebuffer(GL_FRAMEBUFFER, FrameBufferID[eye]);
 			glViewport(0, 0, framebufferWidth, framebufferHeight);
-
+			
 			glClearColor(0.1f, 0.5f, 0.3f, 0.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+			glBindTexture(GL_TEXTURE_2D, TextureID);
+
 			SceneShaderHandler.Use();
+
+			glEnable(GL_DEPTH_TEST);		
+
 			glUniformMatrix4fv(SceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
 			glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
 			glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
 
-			glBindVertexArray(VAOID);
-			glDrawArrays(GL_TRIANGLES, 0, 3);
+			glBindVertexArray(VertexArray);
+			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 			glBindVertexArray(0);
 
 			glUseProgram(0);
@@ -201,8 +297,8 @@ void main()
 	}
 
 	// Properly de-allocate all resources once they've outlived their purpose
-	glDeleteVertexArrays(1, &VAOID);
-	glDeleteBuffers(1, &VertexBufferID);
+	glDeleteVertexArrays(1, &VertexArray);
+	glDeleteBuffers(1, &VertexBuffer);
 
 	glfwDestroyWindow(window);
 	glfwTerminate();
@@ -220,7 +316,7 @@ void Init()
 
 	window = initOpenGL(windowWidth, windowHeight, "minimalOpenGL");
 
-	
+
 	glGenFramebuffers(numEyes, FrameBufferID);							// create frame buffers for each eyes.
 
 	glGenTextures(numEyes, SceneTextureID);								// prepare texture memory space and give it an index
@@ -228,9 +324,9 @@ void Init()
 																		// and define them by index 1 and 2.
 	glGenTextures(numEyes, depthRenderTarget);							// textures of depthRenderTarget are 3 and 4.
 
-	glGenFramebuffers(numEyes, DistortedFrameBufferId);
+	//glGenFramebuffers(numEyes, DistortedFrameBufferId);
 
-	glGenTextures(numEyes, DistortedTexutreId);
+	//glGenTextures(numEyes, DistortedTexutreId);
 	
 	for (int eye = 0; eye < numEyes; ++eye) 
 	{
@@ -241,16 +337,16 @@ void Init()
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, framebufferWidth, framebufferHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 		
-		//glBindTexture(GL_TEXTURE_2D, depthRenderTarget[eye]);
-		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		//glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, framebufferWidth, framebufferHeight, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
+		glBindTexture(GL_TEXTURE_2D, depthRenderTarget[eye]);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, framebufferWidth, framebufferHeight, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, FrameBufferID[eye]);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, SceneTextureID[eye], 0);
-		//glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthRenderTarget[eye], 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthRenderTarget[eye], 0);
 		
 		glBindTexture(GL_TEXTURE_2D, DistortedTexutreId[eye]);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -279,7 +375,7 @@ void Init()
 	WriteMVPMatrixFile("LeftMVPMatrix.txt",  MVPMat[Left]);
 	WriteMVPMatrixFile("RightMVPMatrix.txt", MVPMat[Right]);
 
-	SetupDistortion();
+	//SetupDistortion();
 
 	SceneShaderHandler.Load("SceneVertexShader.vert", "SceneFragmentShader.frag");
 }
@@ -642,28 +738,65 @@ void SetupDistortion()
 
 void RenderDistortion()
 {
-	glDisable(GL_DEPTH_TEST);
+	//glDisable(GL_DEPTH_TEST);
 	glViewport(0, 0, windowWidth, windowHeight);
 
 	glBindVertexArray(m_unLensVAO);
 	DistortShaderHandler.Use();
 
 	//render left lens (first half of index array )
-	glBindTexture(GL_TEXTURE_2D, DistortedTexutreId[Left]);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glDrawElements(GL_TRIANGLES, m_uiIndexSize / 2, GL_UNSIGNED_SHORT, 0);
+	//glBindTexture(GL_TEXTURE_2D, DistortedTexutreId[Left]);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	//glDrawElements(GL_TRIANGLES, m_uiIndexSize / 2, GL_UNSIGNED_SHORT, 0);
 
 	//render right lens (second half of index array )
-	glBindTexture(GL_TEXTURE_2D, DistortedTexutreId[Right]);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glDrawElements(GL_TRIANGLES, m_uiIndexSize / 2, GL_UNSIGNED_SHORT, (const void *)(m_uiIndexSize));
+	//glBindTexture(GL_TEXTURE_2D, DistortedTexutreId[Right]);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	//glDrawElements(GL_TRIANGLES, m_uiIndexSize / 2, GL_UNSIGNED_SHORT, (const void *)(m_uiIndexSize));
 
 	glBindVertexArray(0);
 	glUseProgram(0);
 }
+
+GLuint CreateTexturebyImage(char * filename)
+{
+	GLuint	texture;
+	Mat		TexImage = imread(filename, 1);
+
+	for (int i = 0; i < TexImage.cols; i++)
+	{
+		for (int j = 0; j < TexImage.rows; j++)
+		{
+			int		PixelIdx = TexImage.cols * j + i;
+			uchar	temp;
+
+			temp = TexImage.data[3 * PixelIdx];
+			TexImage.data[3 * PixelIdx] = TexImage.data[3 * PixelIdx + 2];
+			TexImage.data[3 * PixelIdx + 2] = temp;
+		}
+	}
+
+	glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_2D, texture);
+
+	// Set the texture wrapping parameters
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// Set texture wrapping to GL_REPEAT (usually basic wrapping method)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+	// Set texture filtering parameters
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, TexImage.cols, TexImage.rows, 0, GL_RGB, GL_UNSIGNED_BYTE, TexImage.data);
+	glGenerateMipmap(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	return texture;
+}
+
