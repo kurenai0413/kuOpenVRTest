@@ -5,6 +5,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "kuShaderHandler.h"
+
 #include <OpenVR.h>
 
 #include <cstring>
@@ -40,6 +42,8 @@ using namespace std;
 
 GLFWwindow		*	window = nullptr;
 vr::IVRSystem	*	hmd    = nullptr;
+
+kuShaderHandler		SceneShaderHandler;
 
 #pragma region // Frame Buffer Containers
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -91,9 +95,9 @@ unsigned int m_uiIndexSize;
 GLuint	SceneMatrixLocation;
 
 							   // position	       // color
-float	TriangleVertexs[] = {   0.0,  1.0f, 0.0,   1.0f, 0.0f, 0.0f,
-							   1.0f, -1.0f, 0.0,   0.0f, 1.0f, 0.0f,
-							  -1.0f, -1.0f, 0.0,   0.0f, 0.0f, 1.0f };
+float	TriangleVertexs[] = {   0.0,  1.0f, 0.0,    1.0f, 0.0f, 0.0f,
+							    1.0f, -1.0f, 0.0,   0.0f, 1.0f, 0.0f,
+							   -1.0f, -1.0f, 0.0,   0.0f, 0.0f, 1.0f };
 
 void Init();
 GLFWwindow		*	initOpenGL(int width, int height, const std::string& title);
@@ -117,28 +121,8 @@ void RenderDistortion();
 
 #pragma region /* Shaders */
 /////////////////////////////////////////////////////////////////////////////////////////
-GLuint		 SceneProgramID;
 GLuint		 LensProgramID;
 
-const GLchar* vertexShaderSource = "#version 410 core\n"
-								   "uniform mat4 matrix;\n"
-								   "uniform mat4 ViewMat;"
-								   "uniform mat4 ProjMat;"
-								   "layout (location = 0) in vec3 position;\n"
-								   "layout (location = 1) in vec3 color;\n"
-								   "out vec3 ourColor;\n"
-								   "void main()\n"
-								   "{\n"
-								   "gl_Position = matrix * ProjMat * ViewMat * vec4(position, 1.0);\n"
-								   "ourColor = color;\n"
-								   "}\0";
-const GLchar* fragmentShaderSource = "#version 410 core\n"
-									 "in vec3 ourColor;\n"
-									 "out vec4 color;\n"
-									 "void main()\n"
-									 "{\n"
-									 "color = vec4(ourColor, 1.0f);\n"
-									 "}\n\0";
 const GLchar* DistortVertShaderSource = "#version 410 core\n"
 									    "layout(location = 0) in vec4 position;\n"
 									    "layout(location = 1) in vec2 v2UVredIn;\n"
@@ -198,8 +182,8 @@ void main()
 
 	glBindVertexArray(0); // Unbind VAO
 
-	SceneProgramID = CreateShaderProgram(vertexShaderSource, fragmentShaderSource);
-	SceneMatrixLocation = glGetUniformLocation(SceneProgramID, "matrix");
+	
+	SceneMatrixLocation = glGetUniformLocation(SceneShaderHandler.ShaderProgramID, "matrix");
 
 	LensProgramID = CreateShaderProgram(DistortVertShaderSource, DistortFragShaderSource);
 
@@ -207,12 +191,12 @@ void main()
 	glm::mat4	ProjMat, ViewMat;
 
 	ProjMat = glm::perspective(45.0f, (GLfloat)640 / (GLfloat)480, 0.1f, 100.0f);
-	ProjMatLoc = glGetUniformLocation(SceneProgramID, "ProjMat");
+	ProjMatLoc = glGetUniformLocation(SceneShaderHandler.ShaderProgramID, "ProjMat");
 	
 	ViewMat = glm::translate(ViewMat, glm::vec3(0.0f, 0.0f, -10.0f));
 	//ViewMat = glm::rotate(ViewMat, (GLfloat)pi * 60.0f / 180.0f,
 	//						glm::vec3(1.0, 1.0, 0.0)); // mat, degree, axis. (use radians)
-	ViewMatLoc = glGetUniformLocation(SceneProgramID, "ViewMat");
+	ViewMatLoc = glGetUniformLocation(SceneShaderHandler.ShaderProgramID, "ViewMat");
 	
 
 	while (!glfwWindowShouldClose(window))
@@ -228,7 +212,7 @@ void main()
 			glClearColor(0.1f, 0.5f, 0.3f, 0.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-			glUseProgram(SceneProgramID);
+			SceneShaderHandler.Use();
 			glUniformMatrix4fv(SceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
 			glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
 			glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
@@ -343,6 +327,8 @@ void Init()
 	WriteMVPMatrixFile("RightMVPMatrix.txt", MVPMat[Right]);
 
 	SetupDistortion();
+
+	SceneShaderHandler.Load("SceneVertexShader.vert", "SceneFragmentShader.frag");
 }
 
 GLFWwindow* initOpenGL(int width, int height, const std::string& title) 

@@ -13,12 +13,18 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{8b933f4e-98e5-4e4e-a3d4-cd18f595f6a0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="kuOpenVRTest.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
     <ClCompile Include="Matrices.cpp">
+      <Filter>原始程式檔</Filter>
+    </ClCompile>
+    <ClCompile Include="kuShaderHandler.cpp">
       <Filter>原始程式檔</Filter>
     </ClCompile>
   </ItemGroup>
@@ -29,5 +35,22 @@
     <ClInclude Include="Matrices.h">
       <Filter>標頭檔</Filter>
     </ClInclude>
+    <ClInclude Include="kuShaderHandler.h">
+      <Filter>標頭檔</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="SceneVertexShader.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="SceneFragmentShader.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="DistortVertexShader.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="DistortFragmentShader.frag">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
