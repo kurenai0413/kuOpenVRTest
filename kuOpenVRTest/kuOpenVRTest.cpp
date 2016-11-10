@@ -231,19 +231,16 @@ void main()
 
 	GLuint TextureID = CreateTexturebyImage("TexImage.jpg");
 
-	GLuint		ProjMatLoc, ViewMatLoc, SceneMatrixLocation;
-	glm::mat4	ProjMat, ViewMat;
+	GLuint		ProjMatLoc, ViewMatLoc, ModelMatLoc, SceneMatrixLocation;
+	glm::mat4	ProjMat, ModelMat;// , ViewMat;
 
 	SceneMatrixLocation = glGetUniformLocation(SceneShaderHandler.ShaderProgramID, "matrix");
-	ProjMatLoc = glGetUniformLocation(SceneShaderHandler.ShaderProgramID, "ProjMat");
-	ViewMatLoc = glGetUniformLocation(SceneShaderHandler.ShaderProgramID, "ViewMat");
+	ProjMatLoc  = glGetUniformLocation(SceneShaderHandler.ShaderProgramID, "ProjMat");
+	ViewMatLoc  = glGetUniformLocation(SceneShaderHandler.ShaderProgramID, "ViewMat");
+	ModelMatLoc = glGetUniformLocation(SceneShaderHandler.ShaderProgramID, "ModelMat");
 
-	ProjMat = glm::perspective(45.0f, (GLfloat)640 / (GLfloat)480, (float)nearPlaneZ, (float)farPlaneZ);
-
-
-	ViewMat = glm::translate(ViewMat, glm::vec3(0.0f, 0.0f, -3.0f));
-	ViewMat = glm::rotate(ViewMat, (GLfloat)pi * 90.0f / 180.0f,
-						  glm::vec3(1.0, 0.0, 1.0)); // mat, degree, axis. (use radians)
+	ProjMat  = glm::perspective(45.0f, (GLfloat)640 / (GLfloat)480, (float)nearPlaneZ, (float)farPlaneZ);
+	ModelMat = glm::scale(ModelMat, glm::vec3(2.0f, 2.0f, 2.0f));
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -266,9 +263,15 @@ void main()
 
 			glEnable(GL_DEPTH_TEST);		
 
+			glm::mat4 ViewMat;
+			ViewMat = glm::translate(ViewMat, glm::vec3(0.0f, 0.0f, -15.0f));
+			ViewMat = glm::rotate(ViewMat, (GLfloat)pi * (GLfloat)glfwGetTime() * 90.0f / 180.0f,
+								  glm::vec3(1.0, 1.0, 0.0)); // mat, degree, axis. (use radians)
+
 			glUniformMatrix4fv(SceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
 			glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
 			glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
+			glUniformMatrix4fv(ModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
 
 			glBindVertexArray(VertexArray);
 			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
