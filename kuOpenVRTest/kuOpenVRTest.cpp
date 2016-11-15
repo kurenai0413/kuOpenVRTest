@@ -6,6 +6,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "kuShaderHandler.h"
+#include "kuModelObject.h"
 
 #include <OpenVR.h>
 #include <opencv2/opencv.hpp>
@@ -98,7 +99,6 @@ unsigned int m_uiIndexSize;
 float	TriangleVertexs[] = {   0.0f,  1.0f, 0.0f,   1.0f, 0.0f, 0.0f,
 							    1.0f, -1.0f, 0.0f,   0.0f, 1.0f, 0.0f,
 							   -1.0f, -1.0f, 0.0f,   0.0f, 0.0f, 1.0f };
-
 
 const GLfloat	vertices[]
 = {

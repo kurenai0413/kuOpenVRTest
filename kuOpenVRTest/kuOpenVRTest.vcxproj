@@ -69,8 +69,8 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>C:\OpenGL\include;C:\openvr\include;C:\OpenCV310\include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\OpenGL\lib;C:\openvr\lib;C:\OpenCV310\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\OpenGL\include;C:\openvr\include;C:\OpenCV310\include;C:\Assimp\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\OpenGL\lib;C:\openvr\lib;C:\OpenCV310\lib;C:\Assimp;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -113,11 +113,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="kuMesh.cpp" />
+    <ClCompile Include="kuModelObject.cpp" />
     <ClCompile Include="kuOpenVRTest.cpp" />
     <ClCompile Include="kuShaderHandler.cpp" />
     <ClCompile Include="Matrices.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="kuMesh.h" />
+    <ClInclude Include="kuModelObject.h" />
     <ClInclude Include="kuShaderHandler.h" />
     <ClInclude Include="Matrices.h" />
     <ClInclude Include="Vectors.h" />
