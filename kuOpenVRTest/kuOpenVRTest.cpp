@@ -206,7 +206,8 @@ int main()
 	ViewMatLoc  = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ViewMat");
 	ModelMatLoc = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ModelMat");
 
-	ProjMat  = glm::perspective(45.0f, (GLfloat)640 / (GLfloat)480, (float)nearPlaneZ, (float)farPlaneZ);
+	//ProjMat  = glm::perspective(45.0f, (GLfloat)648 / (GLfloat)720, (float)nearPlaneZ, (float)farPlaneZ);
+	//拿掉是因為在Init()裡面透過GetHMDMatrixProjectionEye取出Vive的projection matrix
 
 	ViewMat = glm::translate(ViewMat, glm::vec3(0.0f, 0.0f, -300));		// 這邊放外參(世界座標系統轉到攝影機座標系統 Pc = E * Pw)(應該吧 需要實際測試)
 
@@ -223,7 +224,7 @@ int main()
 			glBindFramebuffer(GL_FRAMEBUFFER, FrameBufferID[eye]);
 			glViewport(0, 0, framebufferWidth, framebufferHeight);
 			
-			glClearColor(0.1f, 0.5f, 0.3f, 0.0f);
+			glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 			glBindTexture(GL_TEXTURE_2D, TextureID);
@@ -252,14 +253,14 @@ int main()
 		vr::Texture_t RTesture = { reinterpret_cast<void*>(intptr_t(SceneTextureID[Right])), vr::API_OpenGL, vr::ColorSpace_Gamma };
 		vr::VRCompositor()->Submit(vr::EVREye(Right), &RTesture);
 
+		vr::VRCompositor()->PostPresentHandoff();
+
 		// Mirror to the window
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, GL_NONE);
 		glViewport(0, 0, 640, 720);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glBlitFramebuffer(0, 0, framebufferWidth, framebufferHeight, 0, 0, 640, 720, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, GL_NONE);
-
-		vr::VRCompositor()->PostPresentHandoff();
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();	// This function processes only those events that are already 
@@ -335,8 +336,8 @@ void Init()
 	EyePoseMat[Right] = GetHMDMatrixPoseEye(vr::Eye_Right);
 
 
-	MVPMat[Left]  = /*ProjectionMat[Left] * */  EyePoseMat[Left];
-	MVPMat[Right] = /*ProjectionMat[Right] * */ EyePoseMat[Right];
+	MVPMat[Left]  = ProjectionMat[Left] * EyePoseMat[Left];
+	MVPMat[Right] = ProjectionMat[Right] * EyePoseMat[Right];
 
 	WriteMVPMatrixFile("LeftMVPMatrix.txt",  MVPMat[Left]);
 	WriteMVPMatrixFile("RightMVPMatrix.txt", MVPMat[Right]);

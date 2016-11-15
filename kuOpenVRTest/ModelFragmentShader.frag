@@ -19,7 +19,7 @@ uniform sampler2D ourTexture;
 void main()
 {    
 	vec3 LightColor = vec3(1.0, 1.0, 1.0);
-	vec3 LightPos   = vec3(0.0, 0.0, 0.0);
+	vec3 LightPos   = vec3(0.0, 0.0, 200.0);
 	vec3 viewPos    = vec3(0.0, 0.0, 0.0);
 
 	// Ambient
