@@ -35,6 +35,8 @@ void kuModelObject::LoadModel(char * filename)
 {
 	Assimp::Importer	importer;
 
+	cout << "Loading model....." << endl;
+
 	const aiScene * scene = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs | 
 														aiProcess_GenNormals );
 	// aiProcessPreset_TargetRealtime_MaxQuality 可以試試看
@@ -53,6 +55,8 @@ void kuModelObject::LoadModel(char * filename)
 
 	// Process ASSIMP's root node recursively
 	this->ProcessNode(scene->mRootNode, scene);
+
+	cout << "Done." << endl;
 }
 
 // 根據node從scene的meshes裡挖東西

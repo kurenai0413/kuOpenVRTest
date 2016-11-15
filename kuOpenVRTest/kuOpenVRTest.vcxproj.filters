@@ -52,16 +52,16 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="SceneVertexShader.vert">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="SceneFragmentShader.frag">
-      <Filter>Shaders</Filter>
-    </None>
     <None Include="DistortVertexShader.vert">
       <Filter>Shaders</Filter>
     </None>
     <None Include="DistortFragmentShader.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="ModelVertexShader.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="ModelFragmentShader.frag">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

@@ -129,8 +129,8 @@
   <ItemGroup>
     <None Include="DistortFragmentShader.frag" />
     <None Include="DistortVertexShader.vert" />
-    <None Include="SceneFragmentShader.frag" />
-    <None Include="SceneVertexShader.vert" />
+    <None Include="ModelFragmentShader.frag" />
+    <None Include="ModelVertexShader.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

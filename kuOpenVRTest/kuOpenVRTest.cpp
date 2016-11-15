@@ -38,7 +38,7 @@
 #define Right		1
 
 #define nearPlaneZ	0.1
-#define farPlaneZ	100
+#define farPlaneZ	1000
 
 using namespace std;
 using namespace cv;
@@ -46,7 +46,7 @@ using namespace cv;
 GLFWwindow		*	window = nullptr;
 vr::IVRSystem	*	hmd    = nullptr;
 
-kuShaderHandler		SceneShaderHandler;
+kuShaderHandler		ModelShaderHandler;
 kuShaderHandler		DistortShaderHandler;
 
 #pragma region // Frame Buffer Containers
@@ -187,60 +187,29 @@ void RenderDistortion();
 
 GLuint	CreateTexturebyImage(char * filename);
 
-void main()
+int main()
 {
 	Init();
-
-	GLuint VertexArray = 0;
-	glGenVertexArrays(1, &VertexArray);
-	GLuint VertexBuffer = 0;  // Vertex Buffer Object (VBO)
-	glGenBuffers(1, &VertexBuffer);
-	GLuint TexCoordBuffer = 0;
-	glGenBuffers(1, &TexCoordBuffer);
-	GLuint ElementBuffer = 0;				// Element Buffer Object (EBO)
-	glGenBuffers(1, &ElementBuffer);
 	
-	// Bind the Vertex Array Object first, then bind and set vertex buffer(s) and attribute pointer(s).
-	glBindVertexArray(VertexArray);
-
-	// Position attribute
-	glBindBuffer(GL_ARRAY_BUFFER, VertexBuffer);
-	//glBufferData(GL_ARRAY_BUFFER, sizeof(TriangleVertexs), TriangleVertexs, GL_STATIC_DRAW);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-	//glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(0);
-
-	// Color attribute
-	//glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
-	//glEnableVertexAttribArray(1);
-
-	// TexCoord
-	glBindBuffer(GL_ARRAY_BUFFER, TexCoordBuffer);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(texCoords), texCoords, GL_STATIC_DRAW);
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(1);
-
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ElementBuffer);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-	glBindVertexArray(0); // Unbind VAO
-	glBindVertexArray(0);
+	kuModelObject	Model("1.stl");
 
 	DistortShaderHandler.Load("DistortVertexShader.vert", "DistortFragmentShader.frag");
+	ModelShaderHandler.Load("ModelVertexShader.vert", "ModelFragmentShader.frag");
 
 	GLuint TextureID = CreateTexturebyImage("TexImage.jpg");
 
 	GLuint		ProjMatLoc, ViewMatLoc, ModelMatLoc, SceneMatrixLocation;
-	glm::mat4	ProjMat, ModelMat;// , ViewMat;
+	glm::mat4	ProjMat, ModelMat, ViewMat;
 
-	SceneMatrixLocation = glGetUniformLocation(SceneShaderHandler.ShaderProgramID, "matrix");
-	ProjMatLoc  = glGetUniformLocation(SceneShaderHandler.ShaderProgramID, "ProjMat");
-	ViewMatLoc  = glGetUniformLocation(SceneShaderHandler.ShaderProgramID, "ViewMat");
-	ModelMatLoc = glGetUniformLocation(SceneShaderHandler.ShaderProgramID, "ModelMat");
+	SceneMatrixLocation = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "matrix");
+	ProjMatLoc  = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ProjMat");
+	ViewMatLoc  = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ViewMat");
+	ModelMatLoc = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ModelMat");
 
 	ProjMat  = glm::perspective(45.0f, (GLfloat)640 / (GLfloat)480, (float)nearPlaneZ, (float)farPlaneZ);
-	ModelMat = glm::scale(ModelMat, glm::vec3(2.0f, 2.0f, 2.0f));
+
+	ViewMat = glm::translate(ViewMat, glm::vec3(0.0f, 0.0f, -300));		// 這邊放外參(世界座標系統轉到攝影機座標系統 Pc = E * Pw)(應該吧 需要實際測試)
+
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -259,23 +228,21 @@ void main()
 
 			glBindTexture(GL_TEXTURE_2D, TextureID);
 
-			SceneShaderHandler.Use();
+			ModelShaderHandler.Use();
 
 			glEnable(GL_DEPTH_TEST);		
 
-			glm::mat4 ViewMat;
-			ViewMat = glm::translate(ViewMat, glm::vec3(0.0f, 0.0f, -15.0f));
-			ViewMat = glm::rotate(ViewMat, (GLfloat)pi * (GLfloat)glfwGetTime() * 90.0f / 180.0f,
-								  glm::vec3(1.0, 1.0, 0.0)); // mat, degree, axis. (use radians)
+			ModelMat = glm::mat4(1.0);
+			ModelMat = glm::rotate(ModelMat, (GLfloat)pi * (float)glfwGetTime() * 10.0f / 180.0f,
+				glm::vec3(0.0f, 1.0f, 0.0f)); // mat, degree, axis. (use radians)
 
 			glUniformMatrix4fv(SceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
 			glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
 			glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
 			glUniformMatrix4fv(ModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
 
-			glBindVertexArray(VertexArray);
-			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-			glBindVertexArray(0);
+			ModelShaderHandler.Use();
+			Model.Draw(ModelShaderHandler);
 
 			glUseProgram(0);
 		}
@@ -299,14 +266,10 @@ void main()
 							// in the event queue and then returns immediately
 	}
 
-	// Properly de-allocate all resources once they've outlived their purpose
-	glDeleteVertexArrays(1, &VertexArray);
-	glDeleteBuffers(1, &VertexBuffer);
-
 	glfwDestroyWindow(window);
 	glfwTerminate();
 
-	system("pause");
+	return 0;
 }
 
 void Init()
@@ -379,8 +342,6 @@ void Init()
 	WriteMVPMatrixFile("RightMVPMatrix.txt", MVPMat[Right]);
 
 	//SetupDistortion();
-
-	SceneShaderHandler.Load("SceneVertexShader.vert", "SceneFragmentShader.frag");
 }
 
 GLFWwindow* initOpenGL(int width, int height, const std::string& title) 
