@@ -78,93 +78,6 @@ Matrix4		ProjectionMat[2];
 Matrix4		EyePoseMat[2];  
 Matrix4		MVPMat[2];
 
-#pragma region // Lens distortion variables
-/////////////////////////////////////////////////////////////////////////////////////////
-struct VertexDataLens				// Vertex data for lens
-{
-	Vector2 position;
-	Vector2 texCoordRed;
-	Vector2 texCoordGreen;
-	Vector2 texCoordBlue;
-};
-
-GLuint		 m_unLensVAO;
-GLuint		 m_glIDVertBuffer;
-GLuint		 m_glIDIndexBuffer;
-unsigned int m_uiIndexSize;
-/////////////////////////////////////////////////////////////////////////////////////////
-#pragma endregion
-
-							   // position	         // color
-float	TriangleVertexs[] = {   0.0f,  1.0f, 0.0f,   1.0f, 0.0f, 0.0f,
-							    1.0f, -1.0f, 0.0f,   0.0f, 1.0f, 0.0f,
-							   -1.0f, -1.0f, 0.0f,   0.0f, 0.0f, 1.0f };
-
-const GLfloat	vertices[]
-= {
-	// Frontal Face
-	-0.5f,  0.5f,  0.5f,			// 0:  Top Left  
-	 0.5f,  0.5f,  0.5f,			// 1:  Top Right
-	 0.5f, -0.5f,  0.5f,			// 2:  Bottom Right
-	-0.5f, -0.5f,  0.5f,			// 3:  Bottom Left
-
-	// Right Face
-	-0.5f,  0.5f, -0.5f,			// 4:  Top Left
-	-0.5f,  0.5f,  0.5f,			// 5:  Top Right
-	-0.5f, -0.5f,  0.5f,			// 6:  Bottom Right
-	-0.5f, -0.5f, -0.5f,			// 7:  Bottom Left
-
-	// Back face
-	 0.5f,  0.5f, -0.5f,			// 8:  Top Left 
-	-0.5f,  0.5f, -0.5f,			// 9:  Top Right
-	-0.5f, -0.5f, -0.5f,			// 10: Bottom Right
-	 0.5f, -0.5f, -0.5f,			// 11: Bottom Left
-
-	// Left Face
-	0.5f,  0.5f,  0.5f,			    // 12: Top Left 
-	0.5f,  0.5f, -0.5f, 			// 13: Top Right
-	0.5f, -0.5f, -0.5f, 			// 14: Bottom Right
-	0.5f, -0.5f,  0.5f,  			// 15: Bottom Left
-
-	// Up Face
-	-0.5f,  0.5f, -0.5f,  		    // 16: Top Left 
-	 0.5f,  0.5f, -0.5f,  		    // 17: Top Right
-	 0.5f,  0.5f,  0.5f,  		    // 18: Bottom Right
-	-0.5f,  0.5f,  0.5f,  		    // 19: Bottom Left
-
-	// Down Face
-	-0.5f, -0.5f,  0.5f,			// 20: Top Left 
-	 0.5f, -0.5f,  0.5f,  			// 21: Top Right
-	 0.5f, -0.5f, -0.5f,    		// 22: Bottom Right
-	-0.5f, -0.5f, -0.5f  			// 23: Bottom Left
-};
-
-const GLfloat   texCoords[]
-= {
-	0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f,
-	0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f,
-	0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f,
-	0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f,
-	0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f,
-	0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f
-};
-
-const GLuint    indices[]
-= {
-	// Frontal 
-	0,  1,  3,	  1,  2,  3,
-	// Right
-	4,  5,  7,	  5,  6,  7,
-	// Back
-	8,  9, 11,	  9, 10, 11,
-	// Left
-	12, 13, 15,  13, 14, 15,
-	// Up
-	16, 17, 19,  17, 18, 19,
-	// Down 
-	20, 21, 23,  21, 22, 23
-};
-
 
 void Init();
 GLFWwindow		*	initOpenGL(int width, int height, const std::string& title);
@@ -182,8 +95,7 @@ void WriteMVPMatrixFile(char * Filename, Matrix4 matMVP);
 void SetMatrix(vr::HmdMatrix44_t HMDProjMat, Matrix4& ProjMat);
 void SetMatrix(vr::HmdMatrix34_t HMDEyePoseMat, Matrix4& PoseMat);
 void CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc &BufferDesc);
-void SetupDistortion();
-void RenderDistortion();
+
 
 GLuint	CreateTexturebyImage(char * filename);
 
@@ -198,7 +110,7 @@ int main()
 
 	GLuint TextureID = CreateTexturebyImage("TexImage.jpg");
 
-	GLuint		ProjMatLoc, ViewMatLoc, ModelMatLoc, SceneMatrixLocation;
+	GLuint		ProjMatLoc, ViewMatLoc, ModelMatLoc, SceneMatrixLocation, CamPosLoc;
 	glm::mat4	ProjMat, ModelMat, ViewMat;
 
 	SceneMatrixLocation = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "matrix");
@@ -206,18 +118,18 @@ int main()
 	ViewMatLoc  = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ViewMat");
 	ModelMatLoc = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ModelMat");
 
+	CamPosLoc = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "CamPos");
+
 	//ProjMat  = glm::perspective(45.0f, (GLfloat)648 / (GLfloat)720, (float)nearPlaneZ, (float)farPlaneZ);
 	//拿掉是因為在Init()裡面透過GetHMDMatrixProjectionEye取出Vive的projection matrix
 
-	ViewMat = glm::translate(ViewMat, glm::vec3(0.0f, 0.0f, -300));		// 這邊放外參(世界座標系統轉到攝影機座標系統 Pc = E * Pw)(應該吧 需要實際測試)
-
-
+	glm::vec3	CamPos = glm::vec3(0.0, 0.0, 500);
+	ViewMat = glm::lookAt(CamPos, glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
+	
 	while (!glfwWindowShouldClose(window))
 	{
 		vr::TrackedDevicePose_t trackedDevicePose[vr::k_unMaxTrackedDeviceCount];
 		vr::VRCompositor()->WaitGetPoses(trackedDevicePose, vr::k_unMaxTrackedDeviceCount, nullptr, 0);
-
-		//RenderDistortion();
 
 		for (int eye = 0; eye < numEyes; ++eye)
 		{
@@ -234,13 +146,15 @@ int main()
 			glEnable(GL_DEPTH_TEST);		
 
 			ModelMat = glm::mat4(1.0);
+			ModelMat = glm::scale(ModelMat, glm::vec3(1.5, 1.5, 1.5));
 			ModelMat = glm::rotate(ModelMat, (GLfloat)pi * (float)glfwGetTime() * 10.0f / 180.0f,
-				glm::vec3(0.0f, 1.0f, 0.0f)); // mat, degree, axis. (use radians)
-
+								   glm::vec3(0.0f, 1.0f, 0.0f)); // mat, degree, axis. (use radians)
+		
 			glUniformMatrix4fv(SceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
 			glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
 			glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
 			glUniformMatrix4fv(ModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
+			glUniform3fv(CamPosLoc, 1, glm::value_ptr(CamPos));
 
 			ModelShaderHandler.Use();
 			Model.Draw(ModelShaderHandler);
@@ -291,9 +205,9 @@ void Init()
 																		// and define them by index 1 and 2.
 	glGenTextures(numEyes, depthRenderTarget);							// textures of depthRenderTarget are 3 and 4.
 
-	//glGenFramebuffers(numEyes, DistortedFrameBufferId);
+	glGenFramebuffers(numEyes, DistortedFrameBufferId);
 
-	//glGenTextures(numEyes, DistortedTexutreId);
+	glGenTextures(numEyes, DistortedTexutreId);
 	
 	for (int eye = 0; eye < numEyes; ++eye) 
 	{
@@ -335,14 +249,11 @@ void Init()
 	EyePoseMat[Left] = GetHMDMatrixPoseEye(vr::Eye_Left);
 	EyePoseMat[Right] = GetHMDMatrixPoseEye(vr::Eye_Right);
 
-
 	MVPMat[Left]  = ProjectionMat[Left] * EyePoseMat[Left];
 	MVPMat[Right] = ProjectionMat[Right] * EyePoseMat[Right];
 
-	WriteMVPMatrixFile("LeftMVPMatrix.txt",  MVPMat[Left]);
-	WriteMVPMatrixFile("RightMVPMatrix.txt", MVPMat[Right]);
-
-	//SetupDistortion();
+	//WriteMVPMatrixFile("LeftMVPMatrix.txt",  MVPMat[Left]);
+	//WriteMVPMatrixFile("RightMVPMatrix.txt", MVPMat[Right]);
 }
 
 GLFWwindow* initOpenGL(int width, int height, const std::string& title) 
@@ -448,7 +359,6 @@ std::string getHMDString(vr::IVRSystem * pHmd, vr::TrackedDeviceIndex_t unDevice
 
 	return sResult;
 }
-
 
 Matrix4 GetHMDMatrixProjectionEye(vr::Hmd_Eye nEye)
 {
@@ -569,164 +479,6 @@ void SetMatrix(vr::HmdMatrix34_t HMDEyePoseMat, Matrix4 & PoseMat)
 void CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc & BufferDesc)
 {
 	//glGenBuffers();
-}
-
-void SetupDistortion()
-{
-	if (!hmd)
-		return;
-
-	GLushort m_iLensGridSegmentCountH = 43;
-	GLushort m_iLensGridSegmentCountV = 43;
-
-	float w = (float)(1.0 / float(m_iLensGridSegmentCountH - 1));
-	float h = (float)(1.0 / float(m_iLensGridSegmentCountV - 1));
-
-	float u, v = 0;
-
-	std::vector<VertexDataLens> vVerts(0);
-	VertexDataLens vert;
-
-	//left eye distortion verts
-	float Xoffset = -1;
-	for (int y = 0; y<m_iLensGridSegmentCountV; y++)
-	{
-		for (int x = 0; x<m_iLensGridSegmentCountH; x++)
-		{
-			u = x*w; v = 1 - y*h;
-			vert.position = Vector2(Xoffset + u, -1 + 2 * y*h);
-
-			vr::DistortionCoordinates_t dc0 = hmd->ComputeDistortion(vr::Eye_Left, u, v);
-
-			vert.texCoordRed   = Vector2(dc0.rfRed[0], 1 - dc0.rfRed[1]);
-			vert.texCoordGreen = Vector2(dc0.rfGreen[0], 1 - dc0.rfGreen[1]);
-			vert.texCoordBlue  = Vector2(dc0.rfBlue[0], 1 - dc0.rfBlue[1]);
-
-			vVerts.push_back(vert);
-		}
-	}
-
-	//right eye distortion verts
-	Xoffset = 0;
-	for (int y = 0; y<m_iLensGridSegmentCountV; y++)
-	{
-		for (int x = 0; x<m_iLensGridSegmentCountH; x++)
-		{
-			u = x*w; v = 1 - y*h;
-			vert.position = Vector2(Xoffset + u, -1 + 2 * y*h);
-
-			vr::DistortionCoordinates_t dc0 = hmd->ComputeDistortion(vr::Eye_Right, u, v);
-
-			vert.texCoordRed = Vector2(dc0.rfRed[0], 1 - dc0.rfRed[1]);
-			vert.texCoordGreen = Vector2(dc0.rfGreen[0], 1 - dc0.rfGreen[1]);
-			vert.texCoordBlue = Vector2(dc0.rfBlue[0], 1 - dc0.rfBlue[1]);
-
-			vVerts.push_back(vert);
-		}
-	}
-
-	std::vector<GLushort> vIndices;
-	GLushort a, b, c, d;
-
-	GLushort offset = 0;
-	for (GLushort y = 0; y<m_iLensGridSegmentCountV - 1; y++)
-	{
-		for (GLushort x = 0; x<m_iLensGridSegmentCountH - 1; x++)
-		{
-			a = m_iLensGridSegmentCountH*y + x + offset;
-			b = m_iLensGridSegmentCountH*y + x + 1 + offset;
-			c = (y + 1)*m_iLensGridSegmentCountH + x + 1 + offset;
-			d = (y + 1)*m_iLensGridSegmentCountH + x + offset;
-			vIndices.push_back(a);
-			vIndices.push_back(b);
-			vIndices.push_back(c);
-
-			vIndices.push_back(a);
-			vIndices.push_back(c);
-			vIndices.push_back(d);
-		}
-	}
-
-	offset = (m_iLensGridSegmentCountH)*(m_iLensGridSegmentCountV);
-	for (GLushort y = 0; y<m_iLensGridSegmentCountV - 1; y++)
-	{
-		for (GLushort x = 0; x<m_iLensGridSegmentCountH - 1; x++)
-		{
-			a = m_iLensGridSegmentCountH*y + x + offset;
-			b = m_iLensGridSegmentCountH*y + x + 1 + offset;
-			c = (y + 1)*m_iLensGridSegmentCountH + x + 1 + offset;
-			d = (y + 1)*m_iLensGridSegmentCountH + x + offset;
-			vIndices.push_back(a);
-			vIndices.push_back(b);
-			vIndices.push_back(c);
-
-			vIndices.push_back(a);
-			vIndices.push_back(c);
-			vIndices.push_back(d);
-		}
-	}
-	m_uiIndexSize = vIndices.size();
-
-	glGenVertexArrays(1, &m_unLensVAO);
-	glBindVertexArray(m_unLensVAO);
-
-	glGenBuffers(1, &m_glIDVertBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, m_glIDVertBuffer);
-	glBufferData(GL_ARRAY_BUFFER, vVerts.size() * sizeof(VertexDataLens), &vVerts[0], GL_STATIC_DRAW);
-
-	glGenBuffers(1, &m_glIDIndexBuffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_glIDIndexBuffer);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, vIndices.size() * sizeof(GLushort), &vIndices[0], GL_STATIC_DRAW);
-
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(VertexDataLens), (void *)offsetof(VertexDataLens, position));
-
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(VertexDataLens), (void *)offsetof(VertexDataLens, texCoordRed));
-
-	glEnableVertexAttribArray(2);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(VertexDataLens), (void *)offsetof(VertexDataLens, texCoordGreen));
-
-	glEnableVertexAttribArray(3);
-	glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(VertexDataLens), (void *)offsetof(VertexDataLens, texCoordBlue));
-
-	glBindVertexArray(0);
-
-	glDisableVertexAttribArray(0);
-	glDisableVertexAttribArray(1);
-	glDisableVertexAttribArray(2);
-	glDisableVertexAttribArray(3);
-
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-}
-
-void RenderDistortion()
-{
-	//glDisable(GL_DEPTH_TEST);
-	glViewport(0, 0, windowWidth, windowHeight);
-
-	glBindVertexArray(m_unLensVAO);
-	DistortShaderHandler.Use();
-
-	//render left lens (first half of index array )
-	//glBindTexture(GL_TEXTURE_2D, DistortedTexutreId[Left]);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	//glDrawElements(GL_TRIANGLES, m_uiIndexSize / 2, GL_UNSIGNED_SHORT, 0);
-
-	//render right lens (second half of index array )
-	//glBindTexture(GL_TEXTURE_2D, DistortedTexutreId[Right]);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	//glDrawElements(GL_TRIANGLES, m_uiIndexSize / 2, GL_UNSIGNED_SHORT, (const void *)(m_uiIndexSize));
-
-	glBindVertexArray(0);
-	glUseProgram(0);
 }
 
 GLuint CreateTexturebyImage(char * filename)
