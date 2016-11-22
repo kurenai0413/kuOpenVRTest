@@ -47,7 +47,6 @@ GLFWwindow		*	window = nullptr;
 vr::IVRSystem	*	hmd    = nullptr;
 
 kuShaderHandler		ModelShaderHandler;
-kuShaderHandler		DistortShaderHandler;
 
 #pragma region // Frame Buffer Containers
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -55,8 +54,6 @@ struct FrameBufferDesc
 {
 	GLuint	SceneTextureId;
 	GLuint	SceneFrameBufferId;
-	GLuint	DistortedTextureId;
-	GLuint	DistortedFrameBufferId;
 };
 
 FrameBufferDesc	EyeFrameDesc[2];
@@ -96,7 +93,6 @@ void SetMatrix(vr::HmdMatrix44_t HMDProjMat, Matrix4& ProjMat);
 void SetMatrix(vr::HmdMatrix34_t HMDEyePoseMat, Matrix4& PoseMat);
 void CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc &BufferDesc);
 
-
 GLuint	CreateTexturebyImage(char * filename);
 
 int main()
@@ -105,7 +101,6 @@ int main()
 	
 	kuModelObject	Model("1.stl");
 
-	DistortShaderHandler.Load("DistortVertexShader.vert", "DistortFragmentShader.frag");
 	ModelShaderHandler.Load("ModelVertexShader.vert", "ModelFragmentShader.frag");
 
 	GLuint TextureID = CreateTexturebyImage("TexImage.jpg");
@@ -195,7 +190,7 @@ void Init()
 	const int windowHeight = 720;
 	const int windowWidth = (framebufferWidth * windowHeight) / framebufferHeight;
 
-	window = initOpenGL(windowWidth, windowHeight, "minimalOpenGL");
+	window = initOpenGL(windowWidth, windowHeight, "kuOpenGLVRTest");
 
 
 	glGenFramebuffers(numEyes, FrameBufferID);							// create frame buffers for each eyes.

@@ -52,12 +52,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="DistortVertexShader.vert">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="DistortFragmentShader.frag">
-      <Filter>Shaders</Filter>
-    </None>
     <None Include="ModelVertexShader.vert">
       <Filter>Shaders</Filter>
     </None>

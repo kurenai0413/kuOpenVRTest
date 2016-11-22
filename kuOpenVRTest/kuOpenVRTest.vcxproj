@@ -127,8 +127,6 @@
     <ClInclude Include="Vectors.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="DistortFragmentShader.frag" />
-    <None Include="DistortVertexShader.vert" />
     <None Include="ModelFragmentShader.frag" />
     <None Include="ModelVertexShader.vert" />
   </ItemGroup>
