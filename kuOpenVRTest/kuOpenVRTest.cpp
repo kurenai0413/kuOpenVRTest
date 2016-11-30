@@ -92,6 +92,9 @@ Mat					RotationVec;
 Mat					RotationMat;
 Mat					TranslationVec;
 
+vector<Point2f>		CB2DPts;
+vector<Point3f>		CB3DPts;
+
 void				DispParam();
 GLfloat				IntrinsicProjMat[16];
 GLfloat				ExtrinsicProjMat[16];
@@ -120,6 +123,8 @@ void					DrawBGImage(Mat BGImg, kuShaderHandler BGShader);
 void					ImgChangeBR(Mat &Img);
 
 bool					LoadCameraParameters(char * Filename);
+
+void					SetCB3DPts();
 
 void					IntrinsicCVtoGL(Mat IntParam, GLfloat GLProjection[16]);
 void					ExtrinsicCVtoGL(Mat RotMat, Mat TransVec, GLfloat GLModelView[16]);
@@ -428,6 +433,8 @@ void Init()
 		}
 		cout << endl;
 	}
+
+	SetCB3DPts();
 }
 
 GLFWwindow* initOpenGL(int width, int height, const std::string& title) 
@@ -861,4 +868,21 @@ void DispParam()
 	}
 	printf("%f %f %f %f\n", DistParam.at<float>(0, 0), DistParam.at<float>(0, 1),
 		DistParam.at<float>(0, 2), DistParam.at<float>(0, 3));
+}
+
+void SetCB3DPts()
+{
+	FILE * fp;
+
+	errno_t err = fopen_s(&fp, "CB3DPts.txt", "w");
+	for (int i = 0; i < 7; i++)
+	{
+		for (int j = 0; j < 5; j++)
+		{
+			CB3DPts.push_back(Point3f(-50 + 25 * j, 75 - 25 * i, 0));
+
+			fprintf_s(fp, "%f %f %f\n", CB3DPts[5 * i + j].x, CB3DPts[5 * i + j].y, CB3DPts[5 * i + j].z);
+		}
+	}
+	fclose(fp);
 }
