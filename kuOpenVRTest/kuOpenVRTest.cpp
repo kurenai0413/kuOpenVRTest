@@ -38,7 +38,10 @@
 #define Right		1
 
 #define nearPlaneZ	0.1
-#define farPlaneZ	1000
+#define farPlaneZ	10000
+
+#define		ImgWidth	640
+#define		ImgHeight	480
 
 using namespace std;
 using namespace cv;
@@ -89,6 +92,7 @@ Mat					RotationVec;
 Mat					RotationMat;
 Mat					TranslationVec;
 
+void				DispParam();
 GLfloat				IntrinsicProjMat[16];
 GLfloat				ExtrinsicProjMat[16];
 
@@ -115,7 +119,10 @@ GLuint					CreateTexturebyImage(Mat Img);
 void					DrawBGImage(Mat BGImg, kuShaderHandler BGShader);
 void					ImgChangeBR(Mat &Img);
 
+bool					LoadCameraParameters(char * Filename);
 
+void					IntrinsicCVtoGL(Mat IntParam, GLfloat GLProjection[16]);
+void					ExtrinsicCVtoGL(Mat RotMat, Mat TransVec, GLfloat GLModelView[16]);
 
 const GLfloat	CubeVertices[]
 = {
@@ -228,19 +235,26 @@ int main()
 	GLuint		ProjMatLoc, ViewMatLoc, ModelMatLoc, SceneMatrixLocation, CamPosLoc;
 	glm::mat4	ProjMat, ModelMat, ViewMat;
 
-	SceneMatrixLocation = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "matrix");
+	/*SceneMatrixLocation = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "matrix");
 	ProjMatLoc			= glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ProjMat");
 	ViewMatLoc			= glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ViewMat");
 	ModelMatLoc			= glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ModelMat");
 
-	CamPosLoc = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "CamPos");
+	CamPosLoc = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "CamPos");*/
 
-	//ProjMat  = glm::perspective(45.0f, (GLfloat)648 / (GLfloat)720, (float)nearPlaneZ, (float)farPlaneZ);
+	ProjMat  = glm::perspective(45.0f, (GLfloat)648 / (GLfloat)720, (float)nearPlaneZ, (float)farPlaneZ);
 	//拿掉是因為在Init()裡面透過GetHMDMatrixProjectionEye取出Vive的projection matrix
 
-	glm::vec3	CamPos = glm::vec3(0.0, 0.0, 500);
+	glm::vec3	CamPos = glm::vec3(0.0, 0.0, 1000);
 	ViewMat = glm::lookAt(CamPos, glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
+
+	ModelMat = glm::rotate(ModelMat, (GLfloat)pi * 45.0f / 180.0f, glm::vec3(1.0, 1.0, 0.0));
 	
+	SceneMatrixLocation = glGetUniformLocation(TexCubeShaderHandler.ShaderProgramID, "matrix");
+	ViewMatLoc  = glGetUniformLocation(TexCubeShaderHandler.ShaderProgramID, "ViewMat");
+	ProjMatLoc  = glGetUniformLocation(TexCubeShaderHandler.ShaderProgramID, "ProjMat");
+	ModelMatLoc = glGetUniformLocation(TexCubeShaderHandler.ShaderProgramID, "ModelMat");
+
 	while (!glfwWindowShouldClose(window))
 	{
 		CamCapture->read(CamFrame);
@@ -262,21 +276,36 @@ int main()
 			glEnable(GL_DEPTH_TEST);
 			glDepthMask(GL_TRUE);
 
-			ModelShaderHandler.Use();
-		
-			ModelMat = glm::mat4(1.0);
-			ModelMat = glm::scale(ModelMat, glm::vec3(1.5, 1.5, 1.5));
-			ModelMat = glm::rotate(ModelMat, (GLfloat)pi * (float)glfwGetTime() * 10.0f / 180.0f,
-								   glm::vec3(0.0f, 1.0f, 0.0f)); // mat, degree, axis. (use radians)
-		
-			glUniformMatrix4fv(SceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
-			//glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
-			glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
-			glUniformMatrix4fv(ModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
-			glUniform3fv(CamPosLoc, 1, glm::value_ptr(CamPos));
+			TexCubeShaderHandler.Use();
 
-			ModelShaderHandler.Use();
-			Model.Draw(ModelShaderHandler);
+			glBindTexture(GL_TEXTURE_2D, CubeTextureID);
+
+			glUniformMatrix4fv(SceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
+			glUniformMatrix4fv(ModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
+			glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
+			glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
+			//glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, ExtrinsicViewMat);
+			//glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, IntrinsicProjMat);
+
+			glBindVertexArray(CubeVertexArray);
+			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+			glBindVertexArray(0);
+
+			//ModelShaderHandler.Use();
+		
+			//ModelMat = glm::mat4(1.0);
+			//ModelMat = glm::scale(ModelMat, glm::vec3(1.5, 1.5, 1.5));
+			//ModelMat = glm::rotate(ModelMat, (GLfloat)pi * (float)glfwGetTime() * 10.0f / 180.0f,
+			//					   glm::vec3(0.0f, 1.0f, 0.0f)); // mat, degree, axis. (use radians)
+		
+			//glUniformMatrix4fv(SceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
+			////glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
+			//glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
+			//glUniformMatrix4fv(ModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
+			//glUniform3fv(CamPosLoc, 1, glm::value_ptr(CamPos));
+
+			//ModelShaderHandler.Use();
+			//Model.Draw(ModelShaderHandler);
 
 			glUseProgram(0);
 		}
@@ -368,8 +397,8 @@ void Init()
 	EyePoseMat[Left] = GetHMDMatrixPoseEye(vr::Eye_Left);
 	EyePoseMat[Right] = GetHMDMatrixPoseEye(vr::Eye_Right);
 
-	MVPMat[Left]  = ProjectionMat[Left] * EyePoseMat[Left];
-	MVPMat[Right] = ProjectionMat[Right] * EyePoseMat[Right];
+	MVPMat[Left]  = /*ProjectionMat[Left] **/ EyePoseMat[Left];
+	MVPMat[Right] = /*ProjectionMat[Right] **/ EyePoseMat[Right];
 
 	//WriteMVPMatrixFile("LeftMVPMatrix.txt",  MVPMat[Left]);
 	//WriteMVPMatrixFile("RightMVPMatrix.txt", MVPMat[Right]);
@@ -383,7 +412,22 @@ void Init()
 	RotationMat.create(3, 3, CV_64FC1);
 	TranslationVec.create(3, 1, CV_64FC1);
 
+	if (LoadCameraParameters("IntParam.txt"))
+	{
+		cout << "Intrinsic Parameters: " << endl;
+		DispParam();
+		cout << endl;
 
+		IntrinsicCVtoGL(IntrinsicMat, IntrinsicProjMat);
+
+		cout << "OpenGL projection matrix: " << endl;
+		for (int i = 0; i < 4; i++)
+		{
+			cout << IntrinsicProjMat[4 * i] << " " << IntrinsicProjMat[4 * i + 1] << " "
+				 << IntrinsicProjMat[4 * i + 2] << " " << IntrinsicProjMat[4 * i + 3] << endl;
+		}
+		cout << endl;
+	}
 }
 
 GLFWwindow* initOpenGL(int width, int height, const std::string& title) 
@@ -712,4 +756,109 @@ void ImgChangeBR(Mat & Img)
 			Img.data[3 * PixelIdx + 2] = temp;
 		}
 	}
+}
+
+bool LoadCameraParameters(char * Filename)
+{
+	FILE	*	fp;
+	errno_t		err;
+
+	err = fopen_s(&fp, Filename, "r");
+	if (err != 0)
+	{
+		return false;
+	}
+	else
+	{
+		for (int i = 0; i < 3; i++)
+		{
+			fscanf_s(fp, "%f %f %f\n", &IntrinsicMat.at<float>(i, 0),
+				&IntrinsicMat.at<float>(i, 1),
+				&IntrinsicMat.at<float>(i, 2));
+		}
+		fscanf_s(fp, "%f %f %f %f\n", &DistParam.at<float>(0, 0),
+			&DistParam.at<float>(0, 1),
+			&DistParam.at<float>(0, 2),
+			&DistParam.at<float>(0, 3));
+		fclose(fp);
+
+		return true;
+	}
+}
+
+void IntrinsicCVtoGL(Mat IntParam, GLfloat GLProjection[16])
+{
+	int			i, j;
+	double		p[3][3];
+	double		q[4][4];
+
+	memset(GLProjection, 0, 16 * sizeof(GLfloat));
+
+	for (i = 0; i < 3; i++)
+	{
+		for (j = 0; j < 3; j++)
+		{
+			p[i][j] = IntParam.at<float>(i, j);
+		}
+	}
+
+	for (i = 0; i < 3; i++)
+	{
+		p[1][i] = (ImgHeight - 1) * p[2][i] - p[1][i];
+	}
+
+	q[0][0] = (2.0 * p[0][0] / (ImgWidth - 1));
+	q[0][1] = (2.0 * p[0][1] / (ImgWidth - 1));
+	q[0][2] = ((2.0 * p[0][2] / (ImgWidth - 1)) - 1.0);
+	q[0][3] = 0.0;
+
+	q[1][0] = 0.0;
+	q[1][1] = (2.0 * p[1][1] / (ImgHeight - 1));
+	q[1][2] = ((2.0 * p[1][2] / (ImgHeight - 1)) - 1.0);
+	q[1][3] = 0.0;
+
+	q[2][0] = 0.0;
+	q[2][1] = 0.0;
+	q[2][2] = (farPlaneZ + nearPlaneZ) / (farPlaneZ - nearPlaneZ);
+	q[2][3] = -2.0 * farPlaneZ * nearPlaneZ / (farPlaneZ - nearPlaneZ);
+
+	q[3][0] = 0.0;
+	q[3][1] = 0.0;
+	q[3][2] = 1.0;
+	q[3][3] = 0.0;
+
+	// transpose
+	for (i = 0; i < 4; i++)
+	{
+		for (j = 0; j < 4; j++)
+		{
+			GLProjection[4 * i + j] = q[j][i];
+		}
+	}
+}
+
+void ExtrinsicCVtoGL(Mat RotMat, Mat TransVec, GLfloat GLModelView[16])
+{
+	memset(GLModelView, 0, 16 * sizeof(GLfloat));
+
+	for (int i = 0; i < 3; i++)
+	{
+		for (int j = 0; j < 3; j++)
+		{
+			GLModelView[4 * i + j] = RotMat.at<double>(j, i);
+		}
+		GLModelView[12 + i] = TransVec.at<double>(i, 0);
+	}
+	GLModelView[15] = 1;
+}
+
+void DispParam()
+{
+	for (int i = 0; i < 3; i++)
+	{
+		printf("%f %f %f\n", IntrinsicMat.at<float>(i, 0), IntrinsicMat.at<float>(i, 1),
+			IntrinsicMat.at<float>(i, 2));
+	}
+	printf("%f %f %f %f\n", DistParam.at<float>(0, 0), DistParam.at<float>(0, 1),
+		DistParam.at<float>(0, 2), DistParam.at<float>(0, 3));
 }
