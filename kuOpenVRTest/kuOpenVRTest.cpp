@@ -93,7 +93,6 @@ void SetMatrix(vr::HmdMatrix44_t HMDProjMat, Matrix4& ProjMat);
 void SetMatrix(vr::HmdMatrix34_t HMDEyePoseMat, Matrix4& PoseMat);
 void CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc &BufferDesc);
 
-GLuint	CreateTexturebyImage(char * filename);
 
 int main()
 {
@@ -102,8 +101,6 @@ int main()
 	kuModelObject	Model("1.stl");
 
 	ModelShaderHandler.Load("ModelVertexShader.vert", "ModelFragmentShader.frag");
-
-	GLuint TextureID = CreateTexturebyImage("TexImage.jpg");
 
 	GLuint		ProjMatLoc, ViewMatLoc, ModelMatLoc, SceneMatrixLocation, CamPosLoc;
 	glm::mat4	ProjMat, ModelMat, ViewMat;
@@ -133,8 +130,6 @@ int main()
 			
 			glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-			glBindTexture(GL_TEXTURE_2D, TextureID);
 
 			ModelShaderHandler.Use();
 
@@ -475,40 +470,3 @@ void CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc & Buff
 {
 	//glGenBuffers();
 }
-
-GLuint CreateTexturebyImage(char * filename)
-{
-	GLuint	texture;
-	Mat		TexImage = imread(filename, 1);
-
-	for (int i = 0; i < TexImage.cols; i++)
-	{
-		for (int j = 0; j < TexImage.rows; j++)
-		{
-			int		PixelIdx = TexImage.cols * j + i;
-			uchar	temp;
-
-			temp = TexImage.data[3 * PixelIdx];
-			TexImage.data[3 * PixelIdx] = TexImage.data[3 * PixelIdx + 2];
-			TexImage.data[3 * PixelIdx + 2] = temp;
-		}
-	}
-
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
-
-	// Set the texture wrapping parameters
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// Set texture wrapping to GL_REPEAT (usually basic wrapping method)
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-	// Set texture filtering parameters
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, TexImage.cols, TexImage.rows, 0, GL_RGB, GL_UNSIGNED_BYTE, TexImage.data);
-	glGenerateMipmap(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	return texture;
-}
-
