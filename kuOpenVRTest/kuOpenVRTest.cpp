@@ -263,6 +263,13 @@ int main()
 	while (!glfwWindowShouldClose(window))
 	{
 		CamCapture->read(CamFrame);
+		
+		Mat	GrayImg;
+		cvtColor(CamFrame, GrayImg, CV_BGR2GRAY);
+
+		bool CBFound = findChessboardCorners(GrayImg, Size(5, 7), CB2DPts,
+			CALIB_CB_ADAPTIVE_THRESH + CALIB_CB_NORMALIZE_IMAGE);
+		drawChessboardCorners(CamFrame, Size(5, 7), Mat(CB2DPts), CBFound);
 		ImgChangeBR(CamFrame);
 
 		vr::TrackedDevicePose_t trackedDevicePose[vr::k_unMaxTrackedDeviceCount];
