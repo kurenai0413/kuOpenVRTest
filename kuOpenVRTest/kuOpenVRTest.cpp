@@ -48,6 +48,7 @@ vr::IVRSystem	*	hmd    = nullptr;
 
 kuShaderHandler		ModelShaderHandler;
 kuShaderHandler		BGImgShaderHandler;
+kuShaderHandler		TexCubeShaderHandler;
 
 #pragma region // Frame Buffer Containers
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -88,6 +89,11 @@ Mat					RotationVec;
 Mat					RotationMat;
 Mat					TranslationVec;
 
+GLfloat				IntrinsicProjMat[16];
+GLfloat				ExtrinsicProjMat[16];
+
+
+
 void Init();
 GLFWwindow		*	initOpenGL(int width, int height, const std::string& title);
 vr::IVRSystem	*	initOpenVR(uint32_t& hmdWidth, uint32_t& hmdHeight);
@@ -109,6 +115,73 @@ GLuint					CreateTexturebyImage(Mat Img);
 void					DrawBGImage(Mat BGImg, kuShaderHandler BGShader);
 void					ImgChangeBR(Mat &Img);
 
+
+
+const GLfloat	CubeVertices[]
+= {
+	// Frontal Face
+	-50.0f,  50.0f,  100.0f,			// 0:  Top Left  
+	50.0f,  50.0f,  100.0f,			// 1:  Top Right
+	50.0f, -50.0f,  100.0f,			// 2:  Bottom Right
+	-50.0f, -50.0f,  100.0f,			// 3:  Bottom Left
+
+										// Right Face
+										-50.0f,  50.0f,   0.0f,			// 4:  Top Left
+										-50.0f,  50.0f,  100.0f,			// 5:  Top Right
+										-50.0f, -50.0f,  100.0f,			// 6:  Bottom Right
+										-50.0f, -50.0f,   0.0f,			// 7:  Bottom Left
+
+																		// Back face
+																		50.0f,  50.0f,   0.0f,			// 8:  Top Left 
+																		-50.0f,  50.0f,   0.0f,			// 9:  Top Right
+																		-50.0f, -50.0f,   0.0f,			// 10: Bottom Right
+																		50.0f, -50.0f,   0.0f,			// 11: Bottom Left
+
+																										// Left Face
+																										50.0f,  50.0f,  100.0f,			// 12: Top Left 
+																										50.0f,  50.0f,   0.0f, 		// 13: Top Right
+																										50.0f, -50.0f,   0.0f, 		// 14: Bottom Right
+																										50.0f, -50.0f,  100.0f,  		// 15: Bottom Left
+
+																																		// Up Face
+																																		-50.0f,  50.0f,   0.0f,  		// 16: Top Left 
+																																		50.0f,  50.0f,   0.0f,  		// 17: Top Right
+																																		50.0f,  50.0f,  100.0f,  		// 18: Bottom Right
+																																		-50.0f,  50.0f,  100.0f,  		// 19: Bottom Left
+
+																																										// Down Face
+																																										-50.0f, -50.0f,  100.0f,			// 20: Top Left 
+																																										50.0f, -50.0f,  100.0f,  		// 21: Top Right
+																																										50.0f, -50.0f,   0.0f,    		// 22: Bottom Right
+																																										-50.0f, -50.0f,   0.0f  		// 23: Bottom Left
+};
+
+const GLfloat   CubeTexCoords[]
+= {
+	0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f,
+	0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f,
+	0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f,
+	0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f,
+	0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f,
+	0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f
+};
+
+const GLuint    CubeIndices[]
+= {
+	// Frontal 
+	0,  1,  3,	  1,  2,  3,
+	// Right
+	4,  5,  7,	  5,  6,  7,
+	// Back
+	8,  9, 11,	  9, 10, 11,
+	// Left
+	12, 13, 15,  13, 14, 15,
+	// Up
+	16, 17, 19,  17, 18, 19,
+	// Down 
+	20, 21, 23,  21, 22, 23
+};
+
 int main()
 {
 	Init();
@@ -117,14 +190,48 @@ int main()
 
 	ModelShaderHandler.Load("ModelVertexShader.vert", "ModelFragmentShader.frag");
 	BGImgShaderHandler.Load("BGImgVertexShader.vert", "BGImgFragmentShader.frag");
+	TexCubeShaderHandler.Load("TexCubeVertexShader.vert", "TexCubeFragmentShader.frag");
+
+	GLuint CubeVertexArray = 0;
+	glGenVertexArrays(1, &CubeVertexArray);
+	GLuint CubeVertexBuffer = 0;							// Vertex Buffer Object (VBO)
+	glGenBuffers(1, &CubeVertexBuffer);						// give an ID to vertex buffer
+	GLuint CubeTexCoordBuffer = 0;
+	glGenBuffers(1, &CubeTexCoordBuffer);
+	GLuint CubeElementBuffer = 0;							// Element Buffer Object (EBO)
+	glGenBuffers(1, &CubeElementBuffer);
+
+	glBindVertexArray(CubeVertexArray);
+
+	glBindBuffer(GL_ARRAY_BUFFER, CubeVertexBuffer);		// Bind buffer as array buffer
+	glBufferData(GL_ARRAY_BUFFER, sizeof(CubeVertices), CubeVertices, GL_STATIC_DRAW);
+	// Position
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, CubeTexCoordBuffer);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(CubeTexCoords), CubeTexCoords, GL_STATIC_DRAW);
+	// TexCoord
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(1);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, CubeElementBuffer);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(CubeIndices), CubeIndices, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+
+	Mat		CubeTextureImg = imread("ihatepeople.jpg");
+	ImgChangeBR(CubeTextureImg);
+	GLuint	CubeTextureID = CreateTexturebyImage(CubeTextureImg);
 
 	GLuint		ProjMatLoc, ViewMatLoc, ModelMatLoc, SceneMatrixLocation, CamPosLoc;
 	glm::mat4	ProjMat, ModelMat, ViewMat;
 
 	SceneMatrixLocation = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "matrix");
-	ProjMatLoc  = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ProjMat");
-	ViewMatLoc  = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ViewMat");
-	ModelMatLoc = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ModelMat");
+	ProjMatLoc			= glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ProjMat");
+	ViewMatLoc			= glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ViewMat");
+	ModelMatLoc			= glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ModelMat");
 
 	CamPosLoc = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "CamPos");
 
@@ -275,6 +382,8 @@ void Init()
 	RotationVec.create(3, 1, CV_64FC1);
 	RotationMat.create(3, 3, CV_64FC1);
 	TranslationVec.create(3, 1, CV_64FC1);
+
+
 }
 
 GLFWwindow* initOpenGL(int width, int height, const std::string& title) 

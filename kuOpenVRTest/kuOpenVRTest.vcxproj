@@ -131,6 +131,8 @@
     <None Include="BGImgVertexShader.vert" />
     <None Include="ModelFragmentShader.frag" />
     <None Include="ModelVertexShader.vert" />
+    <None Include="TexCubeFragmentShader.frag" />
+    <None Include="TexCubeVertexShader.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
