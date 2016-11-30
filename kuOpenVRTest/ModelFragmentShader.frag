@@ -42,6 +42,6 @@ void main()
 	vec3 specular = vec3(0.0, 0.0, 0.0);
 
 				   // lighting color					      // object color
-	//color = vec4(ambient + diffuse + specular, 1.0f) * vec4(1.0f, 1.0f, 1.0f, 1.0f);
-	color = vec4(ambient + diffuse + specular, 1.0f) * texture(ourTexture, TexCoord);
+	color = vec4(ambient + diffuse + specular, 1.0f) * vec4(1.0f, 1.0f, 1.0f, 1.0f);
+	//color = vec4(ambient + diffuse + specular, 1.0f) * texture(ourTexture, TexCoord);
 }

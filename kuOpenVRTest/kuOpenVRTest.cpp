@@ -75,13 +75,21 @@ Matrix4		ProjectionMat[2];
 Matrix4		EyePoseMat[2];  
 Matrix4		MVPMat[2];
 
+glm::vec3 CameraPos   = glm::vec3(0.0f, 0.0f, 200.0f);
+glm::vec3 CameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+glm::vec3 CameraUp    = glm::vec3(0.0f, 1.0f, 0.0f);
 
-void Init();
-GLFWwindow		*	initOpenGL(int width, int height, const std::string& title);
+GLfloat			deltaTime = 0.0f;
+GLfloat			lastFrameT = 0.0f;
+
+bool			keyPressArray[1024];
+
+void				Init();
+GLFWwindow		*	initOpenGL(int width, int height, const std::string& title, GLFWkeyfun cbfun);
 vr::IVRSystem	*	initOpenVR(uint32_t& hmdWidth, uint32_t& hmdHeight);
-std::string getHMDString(vr::IVRSystem* pHmd, vr::TrackedDeviceIndex_t unDevice, 
-						 vr::TrackedDeviceProperty prop, 
-						 vr::TrackedPropertyError* peError = nullptr);
+std::string			getHMDString(vr::IVRSystem* pHmd, vr::TrackedDeviceIndex_t unDevice, 
+								 vr::TrackedDeviceProperty prop, 
+								 vr::TrackedPropertyError* peError = nullptr);
 
 Matrix4 GetHMDMatrixProjectionEye(vr::Hmd_Eye nEye);
 Matrix4 GetHMDMatrixPoseEye(vr::Hmd_Eye nEye);
@@ -95,11 +103,15 @@ void CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc &Buffe
 
 GLuint	CreateTexturebyImage(char * filename);
 
+void			key_callback(GLFWwindow * window, int key, int scancode, int action, int mode);
+void			do_movement();
+
 int main()
 {
 	Init();
 	
-	kuModelObject	Model("1.stl");
+	kuModelObject	Model("LAI-WEN-HSIEN-big.surf.stl");
+	//kuModelObject	Model("1.stl");
 
 	ModelShaderHandler.Load("ModelVertexShader.vert", "ModelFragmentShader.frag");
 
@@ -115,14 +127,18 @@ int main()
 
 	CamPosLoc = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "CamPos");
 
-	//ProjMat  = glm::perspective(45.0f, (GLfloat)648 / (GLfloat)720, (float)nearPlaneZ, (float)farPlaneZ);
-	//拿掉是因為在Init()裡面透過GetHMDMatrixProjectionEye取出Vive的projection matrix
+	//不設定ProjMat的值是因為在Init()裡面透過GetHMDMatrixProjectionEye取出Vive的projection matrix
 
-	glm::vec3	CamPos = glm::vec3(0.0, 0.0, 500);
-	ViewMat = glm::lookAt(CamPos, glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
-	
 	while (!glfwWindowShouldClose(window))
 	{
+		GLfloat currFrameT = glfwGetTime();
+		deltaTime = currFrameT - lastFrameT;
+		lastFrameT = currFrameT;
+
+		glfwPollEvents();	// This function processes only those events that are already 
+							// in the event queue and then returns immediately
+		do_movement();
+
 		vr::TrackedDevicePose_t trackedDevicePose[vr::k_unMaxTrackedDeviceCount];
 		vr::VRCompositor()->WaitGetPoses(trackedDevicePose, vr::k_unMaxTrackedDeviceCount, nullptr, 0);
 
@@ -139,19 +155,15 @@ int main()
 			ModelShaderHandler.Use();
 
 			glEnable(GL_DEPTH_TEST);		
-
-			ModelMat = glm::mat4(1.0);
-			ModelMat = glm::scale(ModelMat, glm::vec3(1.5, 1.5, 1.5));
-			ModelMat = glm::rotate(ModelMat, (GLfloat)pi * (float)glfwGetTime() * 10.0f / 180.0f,
-								   glm::vec3(0.0f, 1.0f, 0.0f)); // mat, degree, axis. (use radians)
 		
+			ViewMat = glm::lookAt(CameraPos, CameraPos + CameraFront, CameraUp);
+
 			glUniformMatrix4fv(SceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
 			glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
 			glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
 			glUniformMatrix4fv(ModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
-			glUniform3fv(CamPosLoc, 1, glm::value_ptr(CamPos));
+			glUniform3fv(CamPosLoc, 1, glm::value_ptr(CameraPos));
 
-			ModelShaderHandler.Use();
 			Model.Draw(ModelShaderHandler);
 
 			glUseProgram(0);
@@ -172,8 +184,6 @@ int main()
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, GL_NONE);
 
 		glfwSwapBuffers(window);
-		glfwPollEvents();	// This function processes only those events that are already 
-							// in the event queue and then returns immediately
 	}
 
 	glfwDestroyWindow(window);
@@ -190,7 +200,7 @@ void Init()
 	const int windowHeight = 720;
 	const int windowWidth = (framebufferWidth * windowHeight) / framebufferHeight;
 
-	window = initOpenGL(windowWidth, windowHeight, "kuOpenGLVRTest");
+	window = initOpenGL(windowWidth, windowHeight, "kuOpenGLVRTest", key_callback);
 
 
 	glGenFramebuffers(numEyes, FrameBufferID);							// create frame buffers for each eyes.
@@ -251,7 +261,7 @@ void Init()
 	//WriteMVPMatrixFile("RightMVPMatrix.txt", MVPMat[Right]);
 }
 
-GLFWwindow* initOpenGL(int width, int height, const std::string& title) 
+GLFWwindow* initOpenGL(int width, int height, const std::string& title, GLFWkeyfun cbfun)
 {
 	if (!glfwInit()) {
 		fprintf(stderr, "ERROR: could not start GLFW\n");
@@ -277,6 +287,8 @@ GLFWwindow* initOpenGL(int width, int height, const std::string& title)
 		::exit(2);
 	}
 	glfwMakeContextCurrent(window);
+
+	glfwSetKeyCallback(window, cbfun);
 
 	// Start GLEW extension handler, with improved support for new features
 	glewExperimental = GL_TRUE;
@@ -512,3 +524,64 @@ GLuint CreateTexturebyImage(char * filename)
 	return texture;
 }
 
+void key_callback(GLFWwindow * window, int key, int scancode, int action, int mode)
+{
+	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+	{
+		glfwSetWindowShouldClose(window, GL_TRUE);
+	}
+
+	if (key >= 0 && key < 1024)
+	{
+		if (action == GLFW_PRESS)
+		{
+			keyPressArray[key] = true;
+		}
+		else if (action == GLFW_RELEASE)
+		{
+			keyPressArray[key] = false;
+		}
+	}
+
+	if (key == GLFW_KEY_C)
+	{
+		cout << "CameraPos: (" << CameraPos.x << ", " << CameraPos.y << ", " << CameraPos.z << ")" << endl;
+	}
+}
+
+void do_movement()
+{
+	// Camera controls
+	GLfloat CameraSpeedX = 2.0f;	// 其實就是一個frame要動的量
+	GLfloat CameraSpeedY = 2.0f;
+	GLfloat CameraSpeedZ = 2.0f;
+
+	GLfloat CameraSpeed = 100.0f * deltaTime;
+
+	if (keyPressArray[GLFW_KEY_W])
+	{
+		CameraPos += CameraSpeed * CameraFront;
+	}
+	if (keyPressArray[GLFW_KEY_S])
+	{
+		CameraPos -= CameraSpeed * CameraFront;
+	}
+	if (keyPressArray[GLFW_KEY_A])
+	{
+		//CameraPos -= glm::normalize(glm::cross(CameraFront, CameraUp)) * cameraSpeed;
+		CameraPos = glm::vec3(CameraPos.x -= CameraSpeed, CameraPos.y, CameraPos.z);
+	}
+	if (keyPressArray[GLFW_KEY_D])
+	{
+		//CameraPos += glm::normalize(glm::cross(CameraFront, CameraUp)) * cameraSpeed;
+		CameraPos = glm::vec3(CameraPos.x += CameraSpeed, CameraPos.y, CameraPos.z);
+	}
+	if (keyPressArray[GLFW_KEY_Z])
+	{
+		CameraPos = glm::vec3(CameraPos.x, CameraPos.y += CameraSpeed, CameraPos.z);
+	}
+	if (keyPressArray[GLFW_KEY_X])
+	{
+		CameraPos = glm::vec3(CameraPos.x, CameraPos.y -= CameraSpeed, CameraPos.z);
+	}
+}

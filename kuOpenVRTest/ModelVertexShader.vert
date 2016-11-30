@@ -15,7 +15,7 @@ out vec3 FragPos;
 
 void main()
 {
-	gl_Position = matrix * ProjMat * ViewMat * ModelMat * vec4(position, 1.0);
+	gl_Position = ProjMat *  matrix * ViewMat * ModelMat * vec4(position, 1.0);
 	//ourColor = vec3(1.0, 1.0, 1.0);
 
 	//FragPos = position;
@@ -23,4 +23,6 @@ void main()
 
 	FragPos = vec3(ModelMat * vec4(position, 1.0f));
 	Normal = mat3(transpose(inverse(ModelMat))) * normal;
+
+	Normal = vec3(-Normal.x, -Normal.y, -Normal.z);
 }
