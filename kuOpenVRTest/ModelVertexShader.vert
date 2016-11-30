@@ -1,6 +1,6 @@
 #version 410 core
 
-uniform mat4 matrix;
+uniform mat4 matrix;						// ViveEyeProjMat * EyePoseMat
 uniform mat4 ModelMat;
 uniform mat4 ViewMat;
 uniform mat4 ProjMat;
@@ -15,7 +15,7 @@ out vec3 FragPos;
 
 void main()
 {
-	gl_Position = matrix * ProjMat * ViewMat * ModelMat * vec4(position, 1.0);
+	gl_Position = matrix /** ProjMat*/ * ViewMat * ModelMat * vec4(position, 1.0);
 	//ourColor = vec3(1.0, 1.0, 1.0);
 
 	//FragPos = position;

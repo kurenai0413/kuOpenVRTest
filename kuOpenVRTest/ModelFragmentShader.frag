@@ -20,10 +20,8 @@ uniform sampler2D ourTexture;
 void main()
 {    
 	vec3 LightColor = vec3(1.0, 1.0, 1.0);
-	//vec3 LightPos   = vec3(0.0, 0.0, 500.0);
-	//vec3 viewPos    = vec3(0.0, 0.0, 500.0);
-	vec3 LightPos = CamPos;
-	vec3 viewPos = CamPos;
+	vec3 LightPos   = CamPos;
+	vec3 viewPos    = CamPos;
 
 	// Ambient
 	vec3 ambient = LightColor * material.ambient;

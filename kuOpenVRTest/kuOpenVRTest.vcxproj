@@ -127,6 +127,8 @@
     <ClInclude Include="Vectors.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="BGImgFragmentShader.frag" />
+    <None Include="BGImgVertexShader.vert" />
     <None Include="ModelFragmentShader.frag" />
     <None Include="ModelVertexShader.vert" />
   </ItemGroup>

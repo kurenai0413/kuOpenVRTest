@@ -47,6 +47,7 @@ GLFWwindow		*	window = nullptr;
 vr::IVRSystem	*	hmd    = nullptr;
 
 kuShaderHandler		ModelShaderHandler;
+kuShaderHandler		BGImgShaderHandler;
 
 #pragma region // Frame Buffer Containers
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -60,21 +61,32 @@ FrameBufferDesc	EyeFrameDesc[2];
 /////////////////////////////////////////////////////////////////////////////////////////
 #pragma endregion
 
-uint32_t	framebufferWidth  = 1280;
-uint32_t	framebufferHeight = 720;
-int			windowWidth		  = 1280;
-int			windowHeight	  = 720;
+uint32_t			framebufferWidth  = 1280;			// this will be updated after initialization of OpenVR
+uint32_t			framebufferHeight = 720;			// this will be updated after initialization of OpenVR
+int					windowWidth		  = 1280;
+int					windowHeight	  = 720;
 
-GLuint		FrameBufferID[numEyes];
-GLuint		SceneTextureID[numEyes];
-GLuint		DistortedFrameBufferId[numEyes];
-GLuint		DistortedTexutreId[numEyes];
-GLuint		depthRenderTarget[numEyes];
+GLuint				FrameBufferID[numEyes];
+GLuint				SceneTextureID[numEyes];
+GLuint				DistortedFrameBufferId[numEyes];
+GLuint				DistortedTexutreId[numEyes];
+GLuint				depthRenderTarget[numEyes];
 
-Matrix4		ProjectionMat[2];
-Matrix4		EyePoseMat[2];  
-Matrix4		MVPMat[2];
+Matrix4				ProjectionMat[2];
+Matrix4				EyePoseMat[2];  
+Matrix4				MVPMat[2];
 
+Mat					GrayImg;
+
+// for AR visualization
+VideoCapture	*	CamCapture = NULL;
+Mat					CamFrame;
+
+Mat					IntrinsicMat;
+Mat					DistParam;
+Mat					RotationVec;
+Mat					RotationMat;
+Mat					TranslationVec;
 
 void Init();
 GLFWwindow		*	initOpenGL(int width, int height, const std::string& title);
@@ -93,6 +105,9 @@ void SetMatrix(vr::HmdMatrix44_t HMDProjMat, Matrix4& ProjMat);
 void SetMatrix(vr::HmdMatrix34_t HMDEyePoseMat, Matrix4& PoseMat);
 void CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc &BufferDesc);
 
+GLuint					CreateTexturebyImage(Mat Img);
+void					DrawBGImage(Mat BGImg, kuShaderHandler BGShader);
+void					ImgChangeBR(Mat &Img);
 
 int main()
 {
@@ -101,6 +116,7 @@ int main()
 	kuModelObject	Model("1.stl");
 
 	ModelShaderHandler.Load("ModelVertexShader.vert", "ModelFragmentShader.frag");
+	BGImgShaderHandler.Load("BGImgVertexShader.vert", "BGImgFragmentShader.frag");
 
 	GLuint		ProjMatLoc, ViewMatLoc, ModelMatLoc, SceneMatrixLocation, CamPosLoc;
 	glm::mat4	ProjMat, ModelMat, ViewMat;
@@ -120,6 +136,9 @@ int main()
 	
 	while (!glfwWindowShouldClose(window))
 	{
+		CamCapture->read(CamFrame);
+		ImgChangeBR(CamFrame);
+
 		vr::TrackedDevicePose_t trackedDevicePose[vr::k_unMaxTrackedDeviceCount];
 		vr::VRCompositor()->WaitGetPoses(trackedDevicePose, vr::k_unMaxTrackedDeviceCount, nullptr, 0);
 
@@ -131,17 +150,20 @@ int main()
 			glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+			DrawBGImage(CamFrame, BGImgShaderHandler);
+			
+			glEnable(GL_DEPTH_TEST);
+			glDepthMask(GL_TRUE);
+
 			ModelShaderHandler.Use();
-
-			glEnable(GL_DEPTH_TEST);		
-
+		
 			ModelMat = glm::mat4(1.0);
 			ModelMat = glm::scale(ModelMat, glm::vec3(1.5, 1.5, 1.5));
 			ModelMat = glm::rotate(ModelMat, (GLfloat)pi * (float)glfwGetTime() * 10.0f / 180.0f,
 								   glm::vec3(0.0f, 1.0f, 0.0f)); // mat, degree, axis. (use radians)
 		
 			glUniformMatrix4fv(SceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
-			glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
+			//glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
 			glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
 			glUniformMatrix4fv(ModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
 			glUniform3fv(CamPosLoc, 1, glm::value_ptr(CamPos));
@@ -244,6 +266,15 @@ void Init()
 
 	//WriteMVPMatrixFile("LeftMVPMatrix.txt",  MVPMat[Left]);
 	//WriteMVPMatrixFile("RightMVPMatrix.txt", MVPMat[Right]);
+
+	// initialize OpenCV video capture
+	CamCapture = new VideoCapture(0);
+
+	IntrinsicMat.create(3, 3, CV_32FC1);
+	DistParam.create(1, 4, CV_32FC1);
+	RotationVec.create(3, 1, CV_64FC1);
+	RotationMat.create(3, 3, CV_64FC1);
+	TranslationVec.create(3, 1, CV_64FC1);
 }
 
 GLFWwindow* initOpenGL(int width, int height, const std::string& title) 
@@ -469,4 +500,107 @@ void SetMatrix(vr::HmdMatrix34_t HMDEyePoseMat, Matrix4 & PoseMat)
 void CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc & BufferDesc)
 {
 	//glGenBuffers();
+}
+
+GLuint CreateTexturebyImage(Mat Img)
+{
+	GLuint	texture;
+
+	glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_2D, texture);
+
+	// Set the texture wrapping parameters
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// Set texture wrapping to GL_REPEAT (usually basic wrapping method)
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+	// Set texture filtering parameters
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, Img.cols, Img.rows, 0, GL_RGB, GL_UNSIGNED_BYTE, Img.data);
+	glGenerateMipmap(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	return texture;
+}
+
+void DrawBGImage(Mat BGImg, kuShaderHandler BGShader)
+{
+	static const GLfloat BGVertices[]
+		= {
+		1.0f,  1.0f, 1.0f, 0.0f,
+		1.0f, -1.0f, 1.0f, 1.0f,
+		-1.0f, -1.0f, 0.0f, 1.0f,
+		-1.0f,  1.0f, 0.0f, 0.0f
+	};
+
+	static const GLfloat BGTexCoords[]
+		= {
+		0.0
+	};
+
+	GLuint indices[]
+		= { 0, 1, 3,
+		1, 2, 3 };
+
+	GLuint BGVertexArray = 0;
+	glGenVertexArrays(1, &BGVertexArray);
+	GLuint BGVertexBuffer = 0;						// Vertex Buffer Object (VBO)
+	glGenBuffers(1, &BGVertexBuffer);				// give an ID to vertex buffer
+	GLuint BGElementBuffer = 0;						// Element Buffer Object (EBO)
+	glGenBuffers(1, &BGElementBuffer);
+
+	glBindVertexArray(BGVertexArray);
+
+	glBindBuffer(GL_ARRAY_BUFFER, BGVertexBuffer);  // Bind buffer as array buffer
+	glBufferData(GL_ARRAY_BUFFER, sizeof(BGVertices), BGVertices, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, BGElementBuffer);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+	// Assign vertex position data
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (GLvoid*)0);
+	glEnableVertexAttribArray(0);
+	// Assign texture coordinates
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (GLvoid*)(2 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(1);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+
+	glDisable(GL_DEPTH_TEST);
+	glDepthMask(GL_FALSE);
+
+	GLuint BGImgTextureID = CreateTexturebyImage(BGImg);
+
+	BGShader.Use();
+
+	glBindTexture(GL_TEXTURE_2D, BGImgTextureID);
+
+	glBindVertexArray(BGVertexArray);
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+	glBindVertexArray(0);
+	//glBindTexture(GL_TEXTURE_2D, 0);
+
+	glDeleteTextures(1, &BGImgTextureID);
+
+	glDeleteVertexArrays(1, &BGVertexArray);
+	glDeleteBuffers(1, &BGVertexBuffer);
+	glDeleteBuffers(1, &BGElementBuffer);
+}
+
+void ImgChangeBR(Mat & Img)
+{
+	for (int i = 0; i < Img.cols; i++)
+	{
+		for (int j = 0; j < Img.rows; j++)
+		{
+			int		PixelIdx = Img.cols * j + i;
+			uchar	temp;
+
+			temp = Img.data[3 * PixelIdx];
+			Img.data[3 * PixelIdx] = Img.data[3 * PixelIdx + 2];
+			Img.data[3 * PixelIdx + 2] = temp;
+		}
+	}
 }
