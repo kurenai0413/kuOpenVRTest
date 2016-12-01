@@ -97,7 +97,7 @@ vector<Point3f>		CB3DPts;
 
 void				DispParam();
 GLfloat				IntrinsicProjMat[16];
-GLfloat				ExtrinsicProjMat[16];
+GLfloat				ExtrinsicViewMat[16];
 
 
 
@@ -237,7 +237,8 @@ int main()
 	ImgChangeBR(CubeTextureImg);
 	GLuint	CubeTextureID = CreateTexturebyImage(CubeTextureImg);
 
-	GLuint		ProjMatLoc, ViewMatLoc, ModelMatLoc, SceneMatrixLocation, CamPosLoc;
+	GLuint		ProjMatLoc, ViewMatLoc, ModelMatLoc, CamPosLoc;
+	//GLuint		SceneMatrixLocation;
 	glm::mat4	ProjMat, ModelMat, ViewMat;
 
 	/*SceneMatrixLocation = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "matrix");
@@ -246,16 +247,8 @@ int main()
 	ModelMatLoc			= glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ModelMat");
 
 	CamPosLoc = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "CamPos");*/
-
-	ProjMat  = glm::perspective(45.0f, (GLfloat)648 / (GLfloat)720, (float)nearPlaneZ, (float)farPlaneZ);
-	//拿掉是因為在Init()裡面透過GetHMDMatrixProjectionEye取出Vive的projection matrix
-
-	glm::vec3	CamPos = glm::vec3(0.0, 0.0, 1000);
-	ViewMat = glm::lookAt(CamPos, glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
-
-	ModelMat = glm::rotate(ModelMat, (GLfloat)pi * 45.0f / 180.0f, glm::vec3(1.0, 1.0, 0.0));
 	
-	SceneMatrixLocation = glGetUniformLocation(TexCubeShaderHandler.ShaderProgramID, "matrix");
+	//SceneMatrixLocation = glGetUniformLocation(TexCubeShaderHandler.ShaderProgramID, "matrix");
 	ViewMatLoc  = glGetUniformLocation(TexCubeShaderHandler.ShaderProgramID, "ViewMat");
 	ProjMatLoc  = glGetUniformLocation(TexCubeShaderHandler.ShaderProgramID, "ProjMat");
 	ModelMatLoc = glGetUniformLocation(TexCubeShaderHandler.ShaderProgramID, "ModelMat");
@@ -268,7 +261,7 @@ int main()
 		cvtColor(CamFrame, GrayImg, CV_BGR2GRAY);
 
 		bool CBFound = findChessboardCorners(GrayImg, Size(5, 7), CB2DPts,
-			CALIB_CB_ADAPTIVE_THRESH + CALIB_CB_NORMALIZE_IMAGE);
+											 CALIB_CB_ADAPTIVE_THRESH + CALIB_CB_NORMALIZE_IMAGE);
 		drawChessboardCorners(CamFrame, Size(5, 7), Mat(CB2DPts), CBFound);
 		ImgChangeBR(CamFrame);
 
@@ -280,7 +273,6 @@ int main()
 			glBindFramebuffer(GL_FRAMEBUFFER, FrameBufferID[eye]);
 			glViewport(0, 0, framebufferWidth, framebufferHeight);
 			
-			glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 			DrawBGImage(CamFrame, BGImgShaderHandler);
@@ -288,20 +280,25 @@ int main()
 			glEnable(GL_DEPTH_TEST);
 			glDepthMask(GL_TRUE);
 
-			TexCubeShaderHandler.Use();
+			if (CBFound)
+			{
+				solvePnP(CB3DPts, CB2DPts, IntrinsicMat, DistParam, RotationVec, TranslationVec);
+				Rodrigues(RotationVec, RotationMat);
 
-			glBindTexture(GL_TEXTURE_2D, CubeTextureID);
+				ExtrinsicCVtoGL(RotationMat, TranslationVec, ExtrinsicViewMat);
 
-			glUniformMatrix4fv(SceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
-			glUniformMatrix4fv(ModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
-			glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
-			glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
-			//glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, ExtrinsicViewMat);
-			//glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, IntrinsicProjMat);
+				TexCubeShaderHandler.Use();
 
-			glBindVertexArray(CubeVertexArray);
-			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-			glBindVertexArray(0);
+				glBindTexture(GL_TEXTURE_2D, CubeTextureID);
+			
+				glUniformMatrix4fv(ModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
+				glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, ExtrinsicViewMat);
+				glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, IntrinsicProjMat);
+
+				glBindVertexArray(CubeVertexArray);
+				glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+				glBindVertexArray(0);
+			}	
 
 			//ModelShaderHandler.Use();
 		
@@ -318,7 +315,7 @@ int main()
 
 			//ModelShaderHandler.Use();
 			//Model.Draw(ModelShaderHandler);
-
+			
 			glUseProgram(0);
 		}
 
