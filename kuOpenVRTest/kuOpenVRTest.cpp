@@ -328,9 +328,9 @@ int main()
 
 		// Mirror to the window
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, GL_NONE);
-		glViewport(0, 0, 640, 720);
+		glViewport(0, 0, 756, 840);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glBlitFramebuffer(0, 0, framebufferWidth, framebufferHeight, 0, 0, 640, 720, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+		glBlitFramebuffer(0, 0, framebufferWidth, framebufferHeight, 0, 0, 756, 840, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, GL_NONE);
 
 		glfwSwapBuffers(window);
@@ -409,8 +409,11 @@ void Init()
 	MVPMat[Left]  = /*ProjectionMat[Left] **/ EyePoseMat[Left];
 	MVPMat[Right] = /*ProjectionMat[Right] **/ EyePoseMat[Right];
 
-	//WriteMVPMatrixFile("LeftMVPMatrix.txt",  MVPMat[Left]);
-	//WriteMVPMatrixFile("RightMVPMatrix.txt", MVPMat[Right]);
+	WriteMVPMatrixFile("LeftEyePoseMat.txt", EyePoseMat[Left]);
+	WriteMVPMatrixFile("RightEyePoseMat.txt", EyePoseMat[Right]);
+
+	WriteMVPMatrixFile("LeftProjectionMat.txt", ProjectionMat[Left]);
+	WriteMVPMatrixFile("RightProjectionMat.txt", ProjectionMat[Right]);
 
 	// initialize OpenCV video capture
 	CamCapture = new VideoCapture(0);
@@ -561,6 +564,7 @@ Matrix4 GetHMDMatrixProjectionEye(vr::Hmd_Eye nEye)
 		WriteProjectionMatrixFile("RightProjectionMatrix.txt", mat);
 	}
 
+	// change to opengl order
 	return Matrix4(
 		mat.m[0][0], mat.m[1][0], mat.m[2][0], mat.m[3][0],
 		mat.m[0][1], mat.m[1][1], mat.m[2][1], mat.m[3][1],
