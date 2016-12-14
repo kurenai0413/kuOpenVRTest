@@ -46,7 +46,6 @@ using namespace cv;
 GLFWwindow		*	window = nullptr;
 vr::IVRSystem	*	hmd    = nullptr;
 
-kuShaderHandler		ModelShaderHandler;
 
 #pragma region // Frame Buffer Containers
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -99,11 +98,13 @@ void SetMatrix(vr::HmdMatrix44_t HMDProjMat, Matrix4& ProjMat);
 void SetMatrix(vr::HmdMatrix34_t HMDEyePoseMat, Matrix4& PoseMat);
 void CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc &BufferDesc);
 
-GLuint	CreateTexturebyImage(char * filename);
+GLuint			CreateTexturebyImage(Mat Img);
 
 void			key_callback(GLFWwindow * window, int key, int scancode, int action, int mode);
 void			mouse_callback(GLFWwindow * window, double xPos, double yPos);
 void			do_movement();
+
+void DrawImage(Mat Img, kuShaderHandler ImgShader);
 
 bool			firstMouse = true;
 
@@ -114,28 +115,66 @@ GLfloat			LastXPos, LastYPos;
 GLfloat			deltaTime = 0.0f;
 GLfloat			lastFrameT = 0.0f;
 
+GLfloat	ImgVertices[]
+= {
+	256.99f,	0.0f, 168.5f,	1.0f, 0.0f,
+	256.99f, 256.99f, 168.5f,	1.0f, 1.0f,
+	0.0f, 256.99f, 168.5f,	0.0f, 1.0f,
+	0.0f,	0.0f, 168.5f,	0.0f, 0.0f
+};
+
+GLuint ImgIndices[]
+= { 0, 1, 3,
+1, 2, 3 };
+
 int main()
 {
 	Init();
 	
-	kuModelObject	Model("LAI-WEN-HSIEN-big.surf.stl");
+	//kuModelObject	Model("LAI-WEN-HSIEN-big.surf.stl");
 	//kuModelObject	Model("1.stl");
 
+	kuModelObject		FaceModel("kuFace_7d5wf_SG.obj");
+	kuModelObject		BoneModel("kuBone_7d5wf_SG.obj");
+	kuShaderHandler		ModelShaderHandler;
+	kuShaderHandler		ImgShader;
+	
 	ModelShaderHandler.Load("ModelVertexShader.vert", "ModelFragmentShader.frag");
+	ImgShader.Load("ImgVertexShader.vert", "ImgFragmentShader.frag");
 
-	GLuint TextureID = CreateTexturebyImage("TexImage.jpg");
+	GLuint		CamPosLoc;
+	GLuint		ProjMatLoc, ViewMatLoc, ModelMatLoc, SceneMatrixLocation;
+	GLuint		ObjColorLoc;
 
-	GLuint		ProjMatLoc, ViewMatLoc, ModelMatLoc, SceneMatrixLocation, CamPosLoc;
+	GLuint		ImgModelMatLoc, ImgViewMatLoc, ImgProjMatLoc, ImgSceneMatrixLocation, TransCT2ModelLoc;
+
 	glm::mat4	ProjMat, ModelMat, ViewMat;
+	glm::mat4	TransCT2Model;
+
+	TransCT2Model = glm::translate(TransCT2Model, glm::vec3(-128.249, -281.249, -287));
 
 	SceneMatrixLocation = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "matrix");
 	ProjMatLoc  = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ProjMat");
 	ViewMatLoc  = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ViewMat");
 	ModelMatLoc = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ModelMat");
+	CamPosLoc   = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "CamPos");
+	ObjColorLoc = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ObjColor");
 
-	CamPosLoc = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "CamPos");
+	ImgSceneMatrixLocation = glGetUniformLocation(ImgShader.ShaderProgramID, "matrix");
+	ImgProjMatLoc    = glGetUniformLocation(ImgShader.ShaderProgramID, "ProjMat");
+	ImgViewMatLoc    = glGetUniformLocation(ImgShader.ShaderProgramID, "ViewMat");
+	ImgModelMatLoc   = glGetUniformLocation(ImgShader.ShaderProgramID, "ModelMat");
+	TransCT2ModelLoc = glGetUniformLocation(ImgShader.ShaderProgramID, "TransCT2Model");
 
 	//不設定ProjMat的值是因為在Init()裡面透過GetHMDMatrixProjectionEye取出Vive的projection matrix
+	
+	GLfloat FaceColorVec[4] = { 0.745f, 0.447f, 0.235f, 0.5 };
+	GLfloat BoneColorVec[4] = { 1.0f, 1.0f, 1.0f, 1.0 };
+
+	Mat AxiImg = imread("HSIEH-CHUNG-HUNG-OrthoSlice.to-byte.0000.bmp", 1);
+
+	ModelMat = glm::rotate(ModelMat, (GLfloat)pi * -90.0f / 180.0f,
+		glm::vec3(1.0f, 0.0f, 0.0f)); // mat, degree, axis. (use radians)
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -158,21 +197,37 @@ int main()
 			glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-			glBindTexture(GL_TEXTURE_2D, TextureID);
-
-			ModelShaderHandler.Use();
-
 			glEnable(GL_DEPTH_TEST);		
 		
 			ViewMat = glm::lookAt(CameraPos, CameraPos + CameraFront, CameraUp);
 
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+			ModelShaderHandler.Use();
 			glUniformMatrix4fv(SceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
 			glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
 			glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
 			glUniformMatrix4fv(ModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
 			glUniform3fv(CamPosLoc, 1, glm::value_ptr(CameraPos));
 
-			Model.Draw(ModelShaderHandler);
+			// Inner object first.
+			glUniform4fv(ObjColorLoc, 1, BoneColorVec);
+			BoneModel.Draw(ModelShaderHandler);
+
+			// Draw outside object latter
+			glUniform4fv(ObjColorLoc, 1, FaceColorVec);
+			FaceModel.Draw(ModelShaderHandler);
+
+			glDisable(GL_DEPTH_TEST);
+
+			ImgShader.Use();
+			glUniformMatrix4fv(ImgSceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
+			glUniformMatrix4fv(ImgProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
+			glUniformMatrix4fv(ImgViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
+			glUniformMatrix4fv(ImgModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
+			glUniformMatrix4fv(TransCT2ModelLoc, 1, GL_FALSE, glm::value_ptr(TransCT2Model));
+			DrawImage(AxiImg, ImgShader);
 
 			glUseProgram(0);
 		}
@@ -499,21 +554,20 @@ void CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc & Buff
 	//glGenBuffers();
 }
 
-GLuint CreateTexturebyImage(char * filename)
+GLuint CreateTexturebyImage(Mat Img)
 {
 	GLuint	texture;
-	Mat		TexImage = imread(filename, 1);
 
-	for (int i = 0; i < TexImage.cols; i++)
+	for (int i = 0; i < Img.cols; i++)
 	{
-		for (int j = 0; j < TexImage.rows; j++)
+		for (int j = 0; j < Img.rows; j++)
 		{
-			int		PixelIdx = TexImage.cols * j + i;
+			int		PixelIdx = Img.cols * j + i;
 			uchar	temp;
 
-			temp = TexImage.data[3 * PixelIdx];
-			TexImage.data[3 * PixelIdx] = TexImage.data[3 * PixelIdx + 2];
-			TexImage.data[3 * PixelIdx + 2] = temp;
+			temp = Img.data[3 * PixelIdx];
+			Img.data[3 * PixelIdx] = Img.data[3 * PixelIdx + 2];
+			Img.data[3 * PixelIdx + 2] = temp;
 		}
 	}
 
@@ -528,7 +582,7 @@ GLuint CreateTexturebyImage(char * filename)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, TexImage.cols, TexImage.rows, 0, GL_RGB, GL_UNSIGNED_BYTE, TexImage.data);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, Img.cols, Img.rows, 0, GL_RGB, GL_UNSIGNED_BYTE, Img.data);
 	glGenerateMipmap(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -630,4 +684,49 @@ void do_movement()
 	{
 		CameraPos = glm::vec3(CameraPos.x, CameraPos.y -= CameraSpeed, CameraPos.z);
 	}
+}
+
+void DrawImage(Mat Img, kuShaderHandler ImgShader)
+{
+	GLuint ImgVertexArray = 0;
+	glGenVertexArrays(1, &ImgVertexArray);
+	GLuint ImgVertexBuffer = 0;						// Vertex Buffer Object (VBO)
+	glGenBuffers(1, &ImgVertexBuffer);				// give an ID to vertex buffer
+	GLuint ImgElementBuffer = 0;						// Element Buffer Object (EBO)
+	glGenBuffers(1, &ImgElementBuffer);
+
+	glBindVertexArray(ImgVertexArray);
+
+	glBindBuffer(GL_ARRAY_BUFFER, ImgVertexBuffer);  // Bind buffer as array buffer
+	glBufferData(GL_ARRAY_BUFFER, sizeof(ImgVertices), ImgVertices, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ImgElementBuffer);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(ImgIndices), ImgIndices, GL_STATIC_DRAW);
+
+	// Assign vertex position data
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid*)0);
+	glEnableVertexAttribArray(0);
+	// Assign texture coordinates
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(1);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+
+	GLuint ImgTextureID = CreateTexturebyImage(Img);
+
+	ImgShader.Use();
+
+	glBindTexture(GL_TEXTURE_2D, ImgTextureID);
+
+	glBindVertexArray(ImgVertexArray);
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+	glBindVertexArray(0);
+	//glBindTexture(GL_TEXTURE_2D, 0);
+
+	glDeleteTextures(1, &ImgTextureID);
+
+	glDeleteVertexArrays(1, &ImgVertexArray);
+	glDeleteBuffers(1, &ImgVertexBuffer);
+	glDeleteBuffers(1, &ImgElementBuffer);
 }

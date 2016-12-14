@@ -58,5 +58,11 @@
     <None Include="ModelFragmentShader.frag">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="ImgFragmentShader.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="ImgVertexShader.vert">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

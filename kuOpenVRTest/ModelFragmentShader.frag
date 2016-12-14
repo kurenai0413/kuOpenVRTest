@@ -16,6 +16,8 @@ out vec4 color;
 uniform vec3 CamPos;
 uniform Material material;
 uniform sampler2D ourTexture;
+uniform vec4 ObjColor;
+
 
 void main()
 {    
@@ -41,5 +43,6 @@ void main()
 
 				   // lighting color					      // object color
 	//color = vec4(ambient + diffuse + specular, 1.0f) * vec4(1.0f, 1.0f, 1.0f, 1.0f);
-	color = vec4(ambient + diffuse + specular, 1.0f) * texture(ourTexture, TexCoord);
+	//color = vec4(ambient + diffuse + specular, 1.0f) * texture(ourTexture, TexCoord);
+	color = vec4(ambient + diffuse + specular, 1.0f) * ObjColor;
 }
