@@ -79,8 +79,6 @@ glm::vec3 CameraPos   = glm::vec3(0.0f, 0.0f, 200.0f);
 glm::vec3 CameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
 glm::vec3 CameraUp    = glm::vec3(0.0f, 1.0f, 0.0f);
 
-GLfloat			deltaTime = 0.0f;
-GLfloat			lastFrameT = 0.0f;
 
 bool			keyPressArray[1024];
 
@@ -104,7 +102,17 @@ void CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc &Buffe
 GLuint	CreateTexturebyImage(char * filename);
 
 void			key_callback(GLFWwindow * window, int key, int scancode, int action, int mode);
+void			mouse_callback(GLFWwindow * window, double xPos, double yPos);
 void			do_movement();
+
+bool			firstMouse = true;
+
+GLfloat			yaw = -90.0f;			// Yaw is initialized to -90.0 degrees since a yaw of 0.0 results in a direction vector pointing to the right
+GLfloat			pitch = 0.0f;
+GLfloat			LastXPos, LastYPos;
+
+GLfloat			deltaTime = 0.0f;
+GLfloat			lastFrameT = 0.0f;
 
 int main()
 {
@@ -289,6 +297,9 @@ GLFWwindow* initOpenGL(int width, int height, const std::string& title, GLFWkeyf
 	glfwMakeContextCurrent(window);
 
 	glfwSetKeyCallback(window, cbfun);
+
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	glfwSetCursorPosCallback(window, mouse_callback);				// 顧名思義...大概只有位置資訊而沒有button事件資訊吧
 
 	// Start GLEW extension handler, with improved support for new features
 	glewExperimental = GL_TRUE;
@@ -547,6 +558,41 @@ void key_callback(GLFWwindow * window, int key, int scancode, int action, int mo
 	{
 		cout << "CameraPos: (" << CameraPos.x << ", " << CameraPos.y << ", " << CameraPos.z << ")" << endl;
 	}
+}
+
+void mouse_callback(GLFWwindow * window, double xPos, double yPos)
+{
+	if (firstMouse)
+	{
+		LastXPos = xPos;
+		LastYPos = yPos;
+
+		firstMouse = false;
+	}
+
+	GLfloat xOffset = xPos - LastXPos;
+	GLfloat yOffset = yPos - LastYPos;
+	LastXPos = xPos;
+	LastYPos = yPos;
+
+	GLfloat sensitivity = 0.05;
+	xOffset *= sensitivity;
+	yOffset *= sensitivity;
+
+	yaw += xOffset;
+	pitch += yOffset;
+
+	// Make sure that when pitch is out of bounds, screen doesn't get flipped
+	if (pitch > 89.0f)
+		pitch = 89.0f;
+	if (pitch < -89.0f)
+		pitch = -89.0f;
+
+	glm::vec3 front;
+	front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+	front.y = sin(glm::radians(pitch));
+	front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+	CameraFront = glm::normalize(front);
 }
 
 void do_movement()
