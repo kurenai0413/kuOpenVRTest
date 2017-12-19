@@ -108,7 +108,8 @@ void DrawImage(Mat Img, kuShaderHandler ImgShader);
 
 bool			firstMouse = true;
 
-GLfloat			yaw = -90.0f;			// Yaw is initialized to -90.0 degrees since a yaw of 0.0 results in a direction vector pointing to the right
+GLfloat			yaw = -90.0f;			
+				// Yaw is initialized to -90.0 degrees since a yaw of 0.0 results in a direction vector pointing to the right
 GLfloat			pitch = 0.0f;
 GLfloat			LastXPos, LastYPos;
 
@@ -117,15 +118,17 @@ GLfloat			lastFrameT = 0.0f;
 
 GLfloat	ImgVertices[]
 = {
-	256.99f,	0.0f, 168.5f,	1.0f, 0.0f,
-	256.99f, 256.99f, 168.5f,	1.0f, 1.0f,
-	0.0f, 256.99f, 168.5f,	0.0f, 1.0f,
-	0.0f,	0.0f, 168.5f,	0.0f, 0.0f
+	256.99f,	 0.0f,  168.5f,	 1.0f,  0.0f,
+	256.99f,  256.99f,  168.5f,	 1.0f,  1.0f,
+	   0.0f,  256.99f,  168.5f,	 0.0f,  1.0f,
+	   0.0f,	 0.0f,  168.5f,	 0.0f,  0.0f
 };
 
 GLuint ImgIndices[]
-= { 0, 1, 3,
-1, 2, 3 };
+= { 
+	0, 1, 3,
+	1, 2, 3 
+};
 
 int main()
 {
@@ -168,13 +171,13 @@ int main()
 
 	//不設定ProjMat的值是因為在Init()裡面透過GetHMDMatrixProjectionEye取出Vive的projection matrix
 	
-	GLfloat FaceColorVec[4] = { 0.745f, 0.447f, 0.235f, 0.5 };
-	GLfloat BoneColorVec[4] = { 1.0f, 1.0f, 1.0f, 1.0 };
+	GLfloat FaceColorVec[4] = { 0.745f, 0.447f, 0.235f, 0.5f };
+	GLfloat BoneColorVec[4] = {   1.0f,   1.0f,   1.0f, 1.0f };
 
 	Mat AxiImg = imread("HSIEH-CHUNG-HUNG-OrthoSlice.to-byte.0000.bmp", 1);
 
 	ModelMat = glm::rotate(ModelMat, (GLfloat)pi * -90.0f / 180.0f,
-		glm::vec3(1.0f, 0.0f, 0.0f)); // mat, degree, axis. (use radians)
+						   glm::vec3(1.0f, 0.0f, 0.0f)); // mat, degree, axis. (use radians)
 
 	while (!glfwWindowShouldClose(window))
 	{
