@@ -17,8 +17,6 @@
 
 using namespace std;
 
-#pragma comment(lib, "assimp-vc130-mtd.lib")
-
 class kuModelObject
 {
 public:

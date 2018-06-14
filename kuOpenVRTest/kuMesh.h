@@ -12,9 +12,6 @@
 
 #include "kuShaderHandler.h"
 
-#pragma comment(lib, "opengl32.lib")
-#pragma comment(lib, "glew32.lib")
-
 using namespace std;
 
 struct kuVertex {

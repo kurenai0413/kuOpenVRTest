@@ -257,3 +257,7 @@ ModelManifest.xml
 /kuOpenVRTest/back/LeftMVPMatrix.txt
 /kuOpenVRTest/LeftMVPMatrix.txt
 /kuOpenVRTest/RightMVPMatrix.txt
+/OpenVR_x64d.props
+/OpenGL.props
+/OpenCV310_x64_Debug.props
+/assimp_x64d.props

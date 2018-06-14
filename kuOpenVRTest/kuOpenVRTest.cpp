@@ -20,14 +20,6 @@
 #include "vectors.h"
 #include "Matrices.h"
 
-#ifdef _DEBUG
-#pragma comment(lib, "opengl32")
-#pragma comment(lib, "glew32d")
-#pragma comment(lib, "glfw3")
-#pragma comment(lib, "opencv_world310d")
-#pragma comment(lib, "openvr_api")
-#endif
-
 //#define _VR
 
 #define pi			3.1415926
@@ -235,9 +227,9 @@ int main()
 			glUseProgram(0);
 		}
 
-		vr::Texture_t LTexture = { reinterpret_cast<void*>(intptr_t(SceneTextureID[Left])), vr::API_OpenGL, vr::ColorSpace_Gamma };
+		vr::Texture_t LTexture = { reinterpret_cast<void*>(intptr_t(SceneTextureID[Left])), vr::TextureType_OpenGL, vr::ColorSpace_Gamma };
 		vr::VRCompositor()->Submit(vr::EVREye(Left), &LTexture);
-		vr::Texture_t RTesture = { reinterpret_cast<void*>(intptr_t(SceneTextureID[Right])), vr::API_OpenGL, vr::ColorSpace_Gamma };
+		vr::Texture_t RTesture = { reinterpret_cast<void*>(intptr_t(SceneTextureID[Right])), vr::TextureType_OpenGL, vr::ColorSpace_Gamma };
 		vr::VRCompositor()->Submit(vr::EVREye(Right), &RTesture);
 
 		vr::VRCompositor()->PostPresentHandoff();
@@ -441,7 +433,7 @@ Matrix4 GetHMDMatrixProjectionEye(vr::Hmd_Eye nEye)
 	if (!hmd)
 		return Matrix4();
 
-	vr::HmdMatrix44_t mat = hmd->GetProjectionMatrix(nEye, nearPlaneZ, farPlaneZ, vr::API_OpenGL);
+	vr::HmdMatrix44_t mat = hmd->GetProjectionMatrix(nEye, nearPlaneZ, farPlaneZ);
 
 	if (nEye == vr::Eye_Left)
 	{
