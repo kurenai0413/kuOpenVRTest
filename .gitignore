@@ -261,3 +261,6 @@ ModelManifest.xml
 /OpenGL.props
 /OpenCV310_x64_Debug.props
 /assimp_x64d.props
+/kuOpenVRTest/kuFace_7d5wf_SG_mm_BottomCenter.stl
+/kuOpenVRTest/kuBone_7d5wf_SG_mm_BottomCenter.stl
+*.stl

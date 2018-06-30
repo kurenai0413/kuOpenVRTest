@@ -62,7 +62,7 @@ GLuint		DistortedFrameBufferId[numEyes];
 GLuint		DistortedTexutreId[numEyes];
 GLuint		depthRenderTarget[numEyes];
 
-Matrix4		ProjectionMat[2];
+Matrix4		HMDProjectionMat[2];
 Matrix4		EyePoseMat[2];  
 Matrix4		MVPMat[2];
 
@@ -95,6 +95,7 @@ GLuint			CreateTexturebyImage(Mat Img);
 void			key_callback(GLFWwindow * window, int key, int scancode, int action, int mode);
 void			mouse_callback(GLFWwindow * window, double xPos, double yPos);
 void			do_movement();
+Matrix4			ConvertSteamVRMatrixToMatrix4(const vr::HmdMatrix34_t &matPose);
 
 void DrawImage(Mat Img, kuShaderHandler ImgShader);
 
@@ -183,6 +184,12 @@ int main()
 
 		vr::TrackedDevicePose_t trackedDevicePose[vr::k_unMaxTrackedDeviceCount];
 		vr::VRCompositor()->WaitGetPoses(trackedDevicePose, vr::k_unMaxTrackedDeviceCount, nullptr, 0);
+
+		Matrix4 HMDPoseMat = ConvertSteamVRMatrixToMatrix4(trackedDevicePose[0].mDeviceToAbsoluteTracking);
+		HMDPoseMat.invert();
+
+		MVPMat[Left] = HMDProjectionMat[Left] * EyePoseMat[Left] * HMDPoseMat;
+		MVPMat[Right] = HMDProjectionMat[Right] * EyePoseMat[Right] * HMDPoseMat;
 
 		for (int eye = 0; eye < numEyes; ++eye)
 		{
@@ -306,14 +313,14 @@ void Init()
 	vr::HmdMatrix44_t	ProjMat[2];
 	vr::HmdMatrix34_t	PoseMat[2];
 
-	ProjectionMat[Left] = GetHMDMatrixProjectionEye(vr::Eye_Left);
-	ProjectionMat[Right] = GetHMDMatrixProjectionEye(vr::Eye_Right);
+	HMDProjectionMat[Left] = GetHMDMatrixProjectionEye(vr::Eye_Left);
+	HMDProjectionMat[Right] = GetHMDMatrixProjectionEye(vr::Eye_Right);
 
 	EyePoseMat[Left] = GetHMDMatrixPoseEye(vr::Eye_Left);
 	EyePoseMat[Right] = GetHMDMatrixPoseEye(vr::Eye_Right);
 
-	MVPMat[Left]  = ProjectionMat[Left] * EyePoseMat[Left];
-	MVPMat[Right] = ProjectionMat[Right] * EyePoseMat[Right];
+	MVPMat[Left]  = HMDProjectionMat[Left] * EyePoseMat[Left];
+	MVPMat[Right] = HMDProjectionMat[Right] * EyePoseMat[Right];
 
 	//WriteMVPMatrixFile("LeftMVPMatrix.txt",  MVPMat[Left]);
 	//WriteMVPMatrixFile("RightMVPMatrix.txt", MVPMat[Right]);
@@ -724,4 +731,15 @@ void DrawImage(Mat Img, kuShaderHandler ImgShader)
 	glDeleteVertexArrays(1, &ImgVertexArray);
 	glDeleteBuffers(1, &ImgVertexBuffer);
 	glDeleteBuffers(1, &ImgElementBuffer);
+}
+
+Matrix4 ConvertSteamVRMatrixToMatrix4(const vr::HmdMatrix34_t &matPose)
+{
+	Matrix4 matrixObj(
+		matPose.m[0][0], matPose.m[1][0], matPose.m[2][0], 0.0,
+		matPose.m[0][1], matPose.m[1][1], matPose.m[2][1], 0.0,
+		matPose.m[0][2], matPose.m[1][2], matPose.m[2][2], 0.0,
+		matPose.m[0][3], matPose.m[1][3], matPose.m[2][3], 1.0f
+	);
+	return matrixObj;
 }
