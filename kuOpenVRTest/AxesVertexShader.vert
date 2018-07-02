@@ -11,6 +11,6 @@ uniform mat4 ProjMat;
 								   
 void main()
 {
-	gl_Position = ProjMat * ViewMat * ModelMat * vec4(position, 1.0);
+	gl_Position = ProjMat * ViewMat * /*ModelMat **/ vec4(position, 1.0);
 	ourColor = color;
 }

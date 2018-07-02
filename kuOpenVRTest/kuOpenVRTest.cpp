@@ -38,7 +38,6 @@ using namespace cv;
 GLFWwindow		*	window = nullptr;
 vr::IVRSystem	*	hmd    = nullptr;
 
-
 #pragma region // Frame Buffer Containers
 /////////////////////////////////////////////////////////////////////////////////////////
 struct FrameBufferDesc
@@ -97,7 +96,8 @@ void			mouse_callback(GLFWwindow * window, double xPos, double yPos);
 void			do_movement();
 Matrix4			ConvertSteamVRMatrixToMatrix4(const vr::HmdMatrix34_t &matPose);
 
-void DrawImage(Mat Img, kuShaderHandler ImgShader);
+void			DrawImage(Mat Img, kuShaderHandler ImgShader);
+void			DrawAxes(kuShaderHandler axesShader, float length, int eyeSide);
 
 bool			firstMouse = true;
 
@@ -108,6 +108,20 @@ GLfloat			LastXPos, LastYPos;
 
 GLfloat			deltaTime = 0.0f;
 GLfloat			lastFrameT = 0.0f;
+
+glm::mat4		ProjMat, ModelMat, ViewMat;
+glm::mat4		TransCT2Model;
+
+#pragma region // Shader uniform location
+GLuint			CamPosLoc;
+GLuint			ProjMatLoc, ViewMatLoc, ModelMatLoc, SceneMatrixLocation;
+GLuint			ObjColorLoc;
+
+GLuint			ImgModelMatLoc, ImgViewMatLoc, ImgProjMatLoc;
+GLuint			ImgSceneMatrixLocation, TransCT2ModelLoc;
+
+GLuint			AxesModelMatLoc, AxesViewMatLoc, AxesProjMatLoc;
+#pragma endregion
 
 GLfloat	ImgVertices[]
 = {
@@ -130,25 +144,19 @@ int main()
 	//kuModelObject	Model("LAI-WEN-HSIEN-big.surf.stl");
 	//kuModelObject	Model("1.stl");
 
-	kuModelObject		FaceModel("kuFace_7d5wf_SG.obj");
+	kuModelObject		FaceModel("PhantomHead.stl");
 	kuModelObject		BoneModel("kuBone_7d5wf_SG.obj");
 	kuShaderHandler		ModelShaderHandler;
 	kuShaderHandler		ImgShader;
+	kuShaderHandler		AxesShaderHandler;
 	
 	ModelShaderHandler.Load("ModelVertexShader.vert", "ModelFragmentShader.frag");
 	ImgShader.Load("ImgVertexShader.vert", "ImgFragmentShader.frag");
-
-	GLuint		CamPosLoc;
-	GLuint		ProjMatLoc, ViewMatLoc, ModelMatLoc, SceneMatrixLocation;
-	GLuint		ObjColorLoc;
-
-	GLuint		ImgModelMatLoc, ImgViewMatLoc, ImgProjMatLoc, ImgSceneMatrixLocation, TransCT2ModelLoc;
-
-	glm::mat4	ProjMat, ModelMat, ViewMat;
-	glm::mat4	TransCT2Model;
+	AxesShaderHandler.Load("AxesVertexShader.vert", "AxesFragmentShader.frag");
 
 	TransCT2Model = glm::translate(TransCT2Model, glm::vec3(-128.249, -281.249, -287));
 
+	// Set model shader uniform location
 	SceneMatrixLocation = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "matrix");
 	ProjMatLoc			= glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ProjMat");
 	ViewMatLoc			= glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ViewMat");
@@ -156,23 +164,35 @@ int main()
 	CamPosLoc			= glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "CamPos");
 	ObjColorLoc			= glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ObjColor");
 
+	// Set image shader uniform location
 	ImgSceneMatrixLocation = glGetUniformLocation(ImgShader.ShaderProgramID, "matrix");
 	ImgProjMatLoc		   = glGetUniformLocation(ImgShader.ShaderProgramID, "ProjMat");
 	ImgViewMatLoc		   = glGetUniformLocation(ImgShader.ShaderProgramID, "ViewMat");
 	ImgModelMatLoc		   = glGetUniformLocation(ImgShader.ShaderProgramID, "ModelMat");
 	TransCT2ModelLoc	   = glGetUniformLocation(ImgShader.ShaderProgramID, "TransCT2Model");
 
-	//不設定ProjMat的值是因為在Init()裡面透過GetHMDMatrixProjectionEye取出Vive的projection matrix
-	
+	// Set coordinate axes shader uniform location
+	AxesViewMatLoc  = glGetUniformLocation(AxesShaderHandler.ShaderProgramID, "ViewMat");
+	AxesProjMatLoc  = glGetUniformLocation(AxesShaderHandler.ShaderProgramID, "ProjMat");
+	AxesModelMatLoc = glGetUniformLocation(AxesShaderHandler.ShaderProgramID, "ModelMat");
+
+	// 不設定ProjMat的值是因為在Init()裡面透過GetHMDMatrixProjectionEye取出Vive的projection matrix
+	// 而且這樣打進shader "matrix"那個location裡面那個轉換矩陣就已經是MVP了....model, view, projection乘一起
+
 	GLfloat FaceColorVec[4] = { 0.745f, 0.447f, 0.235f, 0.5f };
 	GLfloat BoneColorVec[4] = {   1.0f,   1.0f,   1.0f, 1.0f };
 
 	Mat AxiImg = imread("HSIEH-CHUNG-HUNG-OrthoSlice.to-byte.0000.bmp", 1);
 
-	ModelMat = glm::rotate(ModelMat, (GLfloat)pi * -90.0f / 180.0f,
-						   glm::vec3(1.0f, 0.0f, 0.0f)); // mat, degree, axis. (use radians)
-	ModelMat = glm::translate(ModelMat, glm::vec3(0.0f, 0.0f, 20.0f));
+	//ModelMat = glm::rotate(ModelMat, (GLfloat)pi * -90.0f / 180.0f,
+	//					   glm::vec3(1.0f, 0.0f, 0.0f)); // mat, degree, axis. (use radians)
+	//ModelMat = glm::translate(ModelMat, glm::vec3(0.0f, 0.0f, 20.0f));
 	ModelMat = glm::scale(ModelMat, glm::vec3(0.4f, 0.4f, 0.4f));
+
+	GLfloat *range = new GLfloat[2];
+	glGetFloatv(GL_ALIASED_LINE_WIDTH_RANGE, range);
+
+	cout << range[0] << "~" << range[1] << endl;
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -190,7 +210,7 @@ int main()
 		Matrix4 HMDPoseMat = ConvertSteamVRMatrixToMatrix4(trackedDevicePose[0].mDeviceToAbsoluteTracking);
 		HMDPoseMat.invert();
 
-		MVPMat[Left] = HMDProjectionMat[Left] * EyePoseMat[Left] * HMDPoseMat;
+		MVPMat[Left]  = HMDProjectionMat[Left] * EyePoseMat[Left] * HMDPoseMat;
 		MVPMat[Right] = HMDProjectionMat[Right] * EyePoseMat[Right] * HMDPoseMat;
 
 		for (int eye = 0; eye < numEyes; ++eye)
@@ -222,6 +242,8 @@ int main()
 			// Draw outside object latter
 			glUniform4fv(ObjColorLoc, 1, FaceColorVec);
 			FaceModel.Draw(ModelShaderHandler);
+
+			DrawAxes(AxesShaderHandler, 0.3f, eye);
 
 			glDisable(GL_DEPTH_TEST);
 
@@ -269,7 +291,6 @@ void Init()
 
 	window = initOpenGL(windowWidth, windowHeight, "kuOpenGLVRTest", key_callback);
 
-
 	glGenFramebuffers(numEyes, FrameBufferID);							// create frame buffers for each eyes.
 
 	glGenTextures(numEyes, SceneTextureID);								// prepare texture memory space and give it an index
@@ -315,13 +336,13 @@ void Init()
 	vr::HmdMatrix44_t	ProjMat[2];
 	vr::HmdMatrix34_t	PoseMat[2];
 
-	HMDProjectionMat[Left] = GetHMDMatrixProjectionEye(vr::Eye_Left);
+	HMDProjectionMat[Left]  = GetHMDMatrixProjectionEye(vr::Eye_Left);
 	HMDProjectionMat[Right] = GetHMDMatrixProjectionEye(vr::Eye_Right);
 
-	EyePoseMat[Left] = GetHMDMatrixPoseEye(vr::Eye_Left);
+	EyePoseMat[Left]  = GetHMDMatrixPoseEye(vr::Eye_Left);
 	EyePoseMat[Right] = GetHMDMatrixPoseEye(vr::Eye_Right);
 
-	MVPMat[Left]  = HMDProjectionMat[Left] * EyePoseMat[Left];
+	MVPMat[Left]  = HMDProjectionMat[Left]  * EyePoseMat[Left];
 	MVPMat[Right] = HMDProjectionMat[Right] * EyePoseMat[Right];
 
 	//WriteMVPMatrixFile("LeftMVPMatrix.txt",  MVPMat[Left]);
@@ -733,6 +754,55 @@ void DrawImage(Mat Img, kuShaderHandler ImgShader)
 	glDeleteVertexArrays(1, &ImgVertexArray);
 	glDeleteBuffers(1, &ImgVertexBuffer);
 	glDeleteBuffers(1, &ImgElementBuffer);
+}
+
+void DrawAxes(kuShaderHandler axesShader, float length, int eyeSide)
+{
+	GLuint axesVertexArray;
+
+	const GLfloat AxesPts[] = {
+		// position				// color
+		0.0, 0.0,  0.0,		1.0, 0.0, 0.0,
+		length, 0.0,  0.0,		1.0, 0.0, 0.0,
+		0.0,   0.0,  0.0,	0.0, 1.0, 0.0,
+		0.0,   length,  0.0,	0.0, 1.0, 0.0,
+		0.0,   0.0,  0.0,	0.0, 0.0, 1.0,
+		0.0,   0.0,  length,	0.0, 0.0, 1.0
+	};
+
+#pragma region // GL rendering setting //
+	glGenVertexArrays(1, &axesVertexArray);
+	GLuint AxesVertexBuffer = 0;				// Vertex Buffer Object (VBO)
+	glGenBuffers(1, &AxesVertexBuffer);			// give an ID to vertex buffer
+
+	glBindVertexArray(axesVertexArray);
+	glBindBuffer(GL_ARRAY_BUFFER, AxesVertexBuffer); // Bind buffer as array buffer
+	glBufferData(GL_ARRAY_BUFFER, sizeof(AxesPts), AxesPts, GL_STATIC_DRAW);
+
+	// position
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)0);
+	glEnableVertexAttribArray(0);
+
+	// color
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(1);
+
+	//glBindBuffer(GL_ARRAY_BUFFER, 0);
+	//glBindVertexArray(0);
+#pragma endregion
+
+	axesShader.Use();
+
+	glUniformMatrix4fv(AxesModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
+	glUniformMatrix4fv(AxesViewMatLoc, 1, GL_FALSE, MVPMat[eyeSide].get());
+	glUniformMatrix4fv(AxesProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
+
+	glBindVertexArray(axesVertexArray);
+	//glDrawArrays(GL_TRIANGLES, 0, 3); // Starting from vertex 0; 3 vertices total -> 1 triangle
+	glEnable(GL_LINE_SMOOTH);
+	glLineWidth(10);
+	glDrawArrays(GL_LINES, 0, 6); // Starting from vertex 0; 3 vertices total -> 1 triangle
+	glBindVertexArray(0);
 }
 
 Matrix4 ConvertSteamVRMatrixToMatrix4(const vr::HmdMatrix34_t &matPose)

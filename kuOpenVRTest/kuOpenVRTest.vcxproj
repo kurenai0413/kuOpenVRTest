@@ -131,6 +131,8 @@
     <ClInclude Include="Vectors.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="AxesFragmentShader.frag" />
+    <None Include="AxesVertexShader.vert" />
     <None Include="ImgFragmentShader.frag" />
     <None Include="ImgVertexShader.vert" />
     <None Include="ModelFragmentShader.frag" />
