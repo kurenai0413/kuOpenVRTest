@@ -150,17 +150,17 @@ int main()
 	TransCT2Model = glm::translate(TransCT2Model, glm::vec3(-128.249, -281.249, -287));
 
 	SceneMatrixLocation = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "matrix");
-	ProjMatLoc  = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ProjMat");
-	ViewMatLoc  = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ViewMat");
-	ModelMatLoc = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ModelMat");
-	CamPosLoc   = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "CamPos");
-	ObjColorLoc = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ObjColor");
+	ProjMatLoc			= glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ProjMat");
+	ViewMatLoc			= glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ViewMat");
+	ModelMatLoc			= glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ModelMat");
+	CamPosLoc			= glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "CamPos");
+	ObjColorLoc			= glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ObjColor");
 
 	ImgSceneMatrixLocation = glGetUniformLocation(ImgShader.ShaderProgramID, "matrix");
-	ImgProjMatLoc    = glGetUniformLocation(ImgShader.ShaderProgramID, "ProjMat");
-	ImgViewMatLoc    = glGetUniformLocation(ImgShader.ShaderProgramID, "ViewMat");
-	ImgModelMatLoc   = glGetUniformLocation(ImgShader.ShaderProgramID, "ModelMat");
-	TransCT2ModelLoc = glGetUniformLocation(ImgShader.ShaderProgramID, "TransCT2Model");
+	ImgProjMatLoc		   = glGetUniformLocation(ImgShader.ShaderProgramID, "ProjMat");
+	ImgViewMatLoc		   = glGetUniformLocation(ImgShader.ShaderProgramID, "ViewMat");
+	ImgModelMatLoc		   = glGetUniformLocation(ImgShader.ShaderProgramID, "ModelMat");
+	TransCT2ModelLoc	   = glGetUniformLocation(ImgShader.ShaderProgramID, "TransCT2Model");
 
 	//不設定ProjMat的值是因為在Init()裡面透過GetHMDMatrixProjectionEye取出Vive的projection matrix
 	
@@ -171,6 +171,8 @@ int main()
 
 	ModelMat = glm::rotate(ModelMat, (GLfloat)pi * -90.0f / 180.0f,
 						   glm::vec3(1.0f, 0.0f, 0.0f)); // mat, degree, axis. (use radians)
+	ModelMat = glm::translate(ModelMat, glm::vec3(0.0f, 0.0f, 20.0f));
+	ModelMat = glm::scale(ModelMat, glm::vec3(0.4f, 0.4f, 0.4f));
 
 	while (!glfwWindowShouldClose(window))
 	{

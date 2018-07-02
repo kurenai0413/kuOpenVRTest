@@ -11,7 +11,7 @@ void main()
 	color = texture(ourTexture, TexCoord);
 	if (color.r == 0 && color.g == 0 && color.b == 0)
 	{
-		color.a = 0.15;
+		color.a = 0.00;
 	}
 	else
 	{
