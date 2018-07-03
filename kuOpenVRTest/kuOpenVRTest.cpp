@@ -98,6 +98,11 @@ Matrix4			ConvertSteamVRMatrixToMatrix4(const vr::HmdMatrix34_t &matPose);
 
 void			DrawImage(Mat Img, kuShaderHandler ImgShader);
 void			DrawAxes(kuShaderHandler axesShader, float length, int eyeSide);
+void			DrawPath(kuShaderHandler axesShader, int eyeSide);
+void			DrawCube(kuShaderHandler cubeShader, int eyeSide, 
+						 float posX, float posY, float posZ,
+						 glm::vec3 ambient, glm::vec3 diffuse, glm::vec3 specular, 
+						 float cubeSize = 0.5);
 
 bool			firstMouse = true;
 
@@ -125,17 +130,18 @@ GLuint			AxesModelMatLoc, AxesViewMatLoc, AxesProjMatLoc;
 
 GLfloat	ImgVertices[]
 = {
-	256.99f,	 0.0f,  168.5f,	 1.0f,  0.0f,
-	256.99f,  256.99f,  168.5f,	 1.0f,  1.0f,
-	   0.0f,  256.99f,  168.5f,	 0.0f,  1.0f,
-	   0.0f,	 0.0f,  168.5f,	 0.0f,  0.0f
+	128.25f, -128.25f,  10.5f,	 1.0f,  0.0f,
+	128.25f,  128.25f,  10.5f,	 1.0f,  1.0f,
+   -128.25f,  128.25f,  10.5f,	 0.0f,  1.0f,
+   -128.25f, -128.25f,  10.5f,	 0.0f,  0.0f
 };
 
 GLuint ImgIndices[]
-= { 
+= {
 	0, 1, 3,
-	1, 2, 3 
+	1, 2, 3
 };
+
 
 int main()
 {
@@ -181,6 +187,7 @@ int main()
 
 	GLfloat FaceColorVec[4] = { 0.745f, 0.447f, 0.235f, 0.5f };
 	GLfloat BoneColorVec[4] = {   1.0f,   1.0f,   1.0f, 1.0f };
+	GLfloat CubeColorVec[4] = {   1.0f,   0.0f,   0.0f, 1.0f };
 
 	Mat AxiImg = imread("HSIEH-CHUNG-HUNG-OrthoSlice.to-byte.0000.bmp", 1);
 
@@ -188,11 +195,6 @@ int main()
 						   glm::vec3(1.0f, 0.0f, 0.0f)); // mat, degree, axis. (use radians)
 	//ModelMat = glm::translate(ModelMat, glm::vec3(0.0f, 0.0f, 20.0f));
 	ModelMat = glm::scale(ModelMat, glm::vec3(0.005f, 0.005f, 0.005f));
-
-	GLfloat *range = new GLfloat[2];
-	glGetFloatv(GL_ALIASED_LINE_WIDTH_RANGE, range);
-
-	cout << range[0] << "~" << range[1] << endl;
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -228,6 +230,7 @@ int main()
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+			#pragma region // Render virtual model to the frame buffer //
 			ModelShaderHandler.Use();
 			glUniformMatrix4fv(SceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
 			glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
@@ -238,32 +241,45 @@ int main()
 			// Inner object first.
 			glUniform4fv(ObjColorLoc, 1, BoneColorVec);
 			BoneModel.Draw(ModelShaderHandler, glm::vec3(0.3f, 0.3f, 0.3f),
-				glm::vec3(0.5f, 0.5f, 0.5f),
-				glm::vec3(0.3f, 0.3f, 0.3f));
+						   glm::vec3(0.5f, 0.5f, 0.5f),
+						   glm::vec3(0.3f, 0.3f, 0.3f));
 			//BoneModel.Draw(ModelShaderHandler);
 
 			// Draw outside object latter
 			glUniform4fv(ObjColorLoc, 1, FaceColorVec);
 			FaceModel.Draw(ModelShaderHandler, glm::vec3(0.3f, 0.3f, 0.3f),
-				glm::vec3(0.5f, 0.5f, 0.5f),
-				glm::vec3(0.3f, 0.3f, 0.3f));
+						   glm::vec3(0.5f, 0.5f, 0.5f),
+						   glm::vec3(0.3f, 0.3f, 0.3f));
 			//FaceModel.Draw(ModelShaderHandler);
 
+			glUniform4fv(ObjColorLoc, 1, CubeColorVec);
+			DrawCube(ModelShaderHandler, eye,
+				5.25f, -10.5f, 10.5f,
+				glm::vec3(0.3f, 0.3f, 0.3f),
+				glm::vec3(1.0f, 1.0f, 1.0f),
+				glm::vec3(0.3f, 0.3f, 0.3f),
+				3.0f);
+			#pragma endregion
+
 			DrawAxes(AxesShaderHandler, 0.3f, eye);
+			DrawPath(AxesShaderHandler, eye);
 
 			glDisable(GL_DEPTH_TEST);
 
-			//ImgShader.Use();
-			//glUniformMatrix4fv(ImgSceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
-			//glUniformMatrix4fv(ImgProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
-			//glUniformMatrix4fv(ImgViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
-			//glUniformMatrix4fv(ImgModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
-			//glUniformMatrix4fv(TransCT2ModelLoc, 1, GL_FALSE, glm::value_ptr(TransCT2Model));
-			//DrawImage(AxiImg, ImgShader);
+			#pragma region // Render medical image slice to the frame buffer
+			ImgShader.Use();
+			glUniformMatrix4fv(ImgSceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
+			glUniformMatrix4fv(ImgProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
+			glUniformMatrix4fv(ImgViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
+			glUniformMatrix4fv(ImgModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
+			glUniformMatrix4fv(TransCT2ModelLoc, 1, GL_FALSE, glm::value_ptr(TransCT2Model));
+			DrawImage(AxiImg, ImgShader);
+			#pragma endregion
 
 			glUseProgram(0);
 		}
 
+		// Pop frame buffer to VR compositor
 		vr::Texture_t LTexture = { reinterpret_cast<void*>(intptr_t(SceneTextureID[Left])), vr::TextureType_OpenGL, vr::ColorSpace_Gamma };
 		vr::VRCompositor()->Submit(vr::EVREye(Left), &LTexture);
 		vr::Texture_t RTesture = { reinterpret_cast<void*>(intptr_t(SceneTextureID[Right])), vr::TextureType_OpenGL, vr::ColorSpace_Gamma };
@@ -348,14 +364,11 @@ void Init()
 	EyePoseMat[Left]  = GetHMDMatrixPoseEye(vr::Eye_Left);
 	EyePoseMat[Right] = GetHMDMatrixPoseEye(vr::Eye_Right);
 
-	//MVPMat[Left]  = HMDProjectionMat[Left]  * EyePoseMat[Left];
-	//MVPMat[Right] = HMDProjectionMat[Right] * EyePoseMat[Right];
-
 	//WriteMVPMatrixFile("LeftMVPMatrix.txt",  MVPMat[Left]);
 	//WriteMVPMatrixFile("RightMVPMatrix.txt", MVPMat[Right]);
 }
 
-GLFWwindow* initOpenGL(int width, int height, const std::string& title, GLFWkeyfun cbfun)
+GLFWwindow * initOpenGL(int width, int height, const std::string& title, GLFWkeyfun cbfun)
 {
 	if (!glfwInit()) {
 		fprintf(stderr, "ERROR: could not start GLFW\n");
@@ -417,7 +430,7 @@ GLFWwindow* initOpenGL(int width, int height, const std::string& title, GLFWkeyf
 	return window;
 }
 
-vr::IVRSystem* initOpenVR(uint32_t& hmdWidth, uint32_t& hmdHeight) 
+vr::IVRSystem * initOpenVR(uint32_t& hmdWidth, uint32_t& hmdHeight) 
 {
 	vr::EVRInitError eError = vr::VRInitError_None;
 	vr::IVRSystem* hmd = vr::VR_Init(&eError, vr::VRApplication_Scene);
@@ -808,6 +821,170 @@ void DrawAxes(kuShaderHandler axesShader, float length, int eyeSide)
 	glEnable(GL_LINE_SMOOTH);
 	glLineWidth(10);
 	glDrawArrays(GL_LINES, 0, 6); // Starting from vertex 0; 3 vertices total -> 1 triangle
+	glBindVertexArray(0);
+}
+
+void DrawPath(kuShaderHandler axesShader, int eyeSide)
+{
+	const GLfloat SurgicalPathVertices[]
+		= {
+		// Position				// Color
+		0.0f, 0.0f, 0.0f,		1.0f, 0.0f, 1.0f,
+		1.5f, 3.0f, 3.0f,		1.0f, 0.0f, 1.0f
+	};
+
+	GLuint axesVertexArray;
+
+#pragma region // GL rendering setting //
+	glGenVertexArrays(1, &axesVertexArray);
+	GLuint AxesVertexBuffer = 0;				// Vertex Buffer Object (VBO)
+	glGenBuffers(1, &AxesVertexBuffer);			// give an ID to vertex buffer
+
+	glBindVertexArray(axesVertexArray);
+	glBindBuffer(GL_ARRAY_BUFFER, AxesVertexBuffer); // Bind buffer as array buffer
+	glBufferData(GL_ARRAY_BUFFER, sizeof(SurgicalPathVertices), SurgicalPathVertices, GL_STATIC_DRAW);
+
+	// position
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)0);
+	glEnableVertexAttribArray(0);
+
+	// color
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(1);
+
+	//glBindBuffer(GL_ARRAY_BUFFER, 0);
+	//glBindVertexArray(0);
+#pragma endregion
+
+	axesShader.Use();
+
+	glUniformMatrix4fv(AxesModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
+	glUniformMatrix4fv(AxesViewMatLoc, 1, GL_FALSE, MVPMat[eyeSide].get());
+	glUniformMatrix4fv(AxesProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
+
+	glBindVertexArray(axesVertexArray);
+	//glDrawArrays(GL_TRIANGLES, 0, 3); // Starting from vertex 0; 3 vertices total -> 1 triangle
+	glEnable(GL_LINE_SMOOTH);
+	glLineWidth(10);
+	glDrawArrays(GL_LINES, 0, 2); // Starting from vertex 0; 3 vertices total -> 1 triangle
+	glBindVertexArray(0);
+}
+
+void DrawCube(kuShaderHandler cubeShader, int eyeSide, 
+			  float posX, float posY, float posZ,
+			  glm::vec3 ambient, glm::vec3 diffuse, glm::vec3 specular, float cubeSize)
+{
+	const GLfloat	vertices[]
+		= {
+		// Frontal Face
+		posX - cubeSize, posY + cubeSize, posZ + cubeSize,		// 0:  Top Left  
+		posX + cubeSize, posY + cubeSize, posZ + cubeSize,			// 1:  Top Right
+		posX + cubeSize, posY - cubeSize, posZ + cubeSize,			// 2:  Bottom Right
+		posX - cubeSize, posY - cubeSize, posZ + cubeSize,		// 3:  Bottom Left
+							
+		// Right Face	po	Y + s		posZ +
+		posX - cubeSize, posY + cubeSize, posZ - cubeSize,			// 4:  Top Left
+		posX - cubeSize, posY + cubeSize, posZ + cubeSize,			// 5:  Top Right
+		posX - cubeSize, posY - cubeSize, posZ + cubeSize,			// 6:  Bottom Right
+		posX - cubeSize, posY - cubeSize, posZ - cubeSize,			// 7:  Bottom Left
+								
+		// Back face	po	Y + s		posZ +
+		posX + cubeSize, posY + cubeSize, posZ - cubeSize,			// 8:  Top Left 
+		posX - cubeSize, posY + cubeSize, posZ - cubeSize,			// 9:  Top Right
+		posX - cubeSize, posY - cubeSize, posZ - cubeSize,			// 10: Bottom Right
+		posX + cubeSize, posY - cubeSize, posZ - cubeSize,			// 11: Bottom Left
+		 						
+		// Left Face	po	Y + s		posZ +
+		posX + cubeSize, posY +  cubeSize, posZ + cubeSize,			// 12: Top Left 
+		posX + cubeSize, posY +  cubeSize, posZ +-cubeSize, 			// 13: Top Right
+		posX + cubeSize, posY - cubeSize, posZ +-cubeSize, 			// 14: Bottom Right
+		posX + cubeSize, posY - cubeSize, posZ + cubeSize,  			// 15: Bottom Left
+		 				
+		// Up Face		po	Y + s		posZ +
+		posX - cubeSize, posY + cubeSize, posZ - cubeSize,  		    // 16: Top Left 
+		posX + cubeSize, posY + cubeSize, posZ - cubeSize,  		    // 17: Top Right
+		posX + cubeSize, posY + cubeSize, posZ + cubeSize,  		    // 18: Bottom Right
+		posX - cubeSize, posY + cubeSize, posZ + cubeSize,  		    // 19: Bottom Left
+		 						
+		// Down Face	po	Y + s		posZ +
+		posX - cubeSize, posY - cubeSize, posZ + cubeSize,			// 20: Top Left 
+		posX + cubeSize, posY - cubeSize, posZ + cubeSize,  			// 21: Top Right
+		posX + cubeSize, posY - cubeSize, posZ - cubeSize,    		// 22: Bottom Right
+		posX - cubeSize, posY - cubeSize, posZ - cubeSize  			// 23: Bottom Left
+	};
+
+	const GLfloat   texCoords[]
+		= {
+		0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f,
+		0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f,
+		0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f,
+		0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f,
+		0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f,
+		0.0f, 0.0f,    1.0f, 0.0f,    1.0f, 1.0f,    0.0f, 1.0f
+	};
+
+	const GLuint    indices[]
+		= {
+		// Frontal 
+		0,  1,  3,	  1,  2,  3,
+		// Right
+		4,  5,  7,	  5,  6,  7,
+		// Back
+		8,  9, 11,	  9, 10, 11,
+		// Left
+		12, 13, 15,  13, 14, 15,
+		// Up
+		16, 17, 19,  17, 18, 19,
+		// Down 
+		20, 21, 23,  21, 22, 23
+	};
+
+#pragma region // Set VAO, VBO and EBO //
+	GLuint VertexArray = 0;
+	glGenVertexArrays(1, &VertexArray);
+	GLuint VertexBuffer = 0;				// Vertex Buffer Object (VBO)
+	glGenBuffers(1, &VertexBuffer);			// give an ID to vertex buffer
+	GLuint TexCoordBuffer = 0;
+	glGenBuffers(1, &TexCoordBuffer);
+	GLuint ElementBuffer = 0;				// Element Buffer Object (EBO)
+	glGenBuffers(1, &ElementBuffer);
+
+	glBindVertexArray(VertexArray);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VertexBuffer); // Bind buffer as array buffer
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	// Position
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, TexCoordBuffer);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(texCoords), texCoords, GL_STATIC_DRAW);
+	// TexCoord
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(1);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ElementBuffer);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+#pragma endregion
+
+	cubeShader.Use();
+
+	glUniform3f(glGetUniformLocation(cubeShader.ShaderProgramID, "material.ambient"),
+		ambient.r, ambient.g, ambient.b);
+	glUniform3f(glGetUniformLocation(cubeShader.ShaderProgramID, "material.diffuse"),
+		diffuse.r, diffuse.g, diffuse.b);
+	glUniform3f(glGetUniformLocation(cubeShader.ShaderProgramID, "material.specular"),
+		specular.r, specular.g, specular.b);
+
+	//glUniformMatrix4fv(AxesModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
+	//glUniformMatrix4fv(AxesViewMatLoc, 1, GL_FALSE, MVPMat[eyeSide].get());
+	//glUniformMatrix4fv(AxesProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
+
+	glBindVertexArray(VertexArray);
+	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
 }
 

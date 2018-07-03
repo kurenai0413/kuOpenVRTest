@@ -264,3 +264,11 @@ ModelManifest.xml
 /kuOpenVRTest/kuFace_7d5wf_SG_mm_BottomCenter.stl
 /kuOpenVRTest/kuBone_7d5wf_SG_mm_BottomCenter.stl
 *.stl
+/kuOpenVRTest/RightPoseMatrix.txt
+/kuOpenVRTest/LeftPoseMatrix.txt
+/kuOpenVRTest/RightProjectionMatrix.txt
+/kuOpenVRTest/LeftProjectionMatrix.txt
+/kuOpenVRTest/LeftProjectionMatrix.txt
+/kuOpenVRTest/RightPoseMatrix.txt
+/kuOpenVRTest/RightProjectionMatrix.txt
+/kuOpenVRTest/LeftPoseMatrix.txt

@@ -12,6 +12,6 @@ uniform mat4 ProjMat;
 								   
 void main()
 {
-	gl_Position = ProjMat * matrix * ViewMat * ModelMat * TransCT2Model * vec4(position, 1.0);
+	gl_Position = ProjMat * matrix * /*ViewMat **/ ModelMat * /*TransCT2Model **/ vec4(position, 1.0);
 	TexCoord = texCoord;
 }
