@@ -15,7 +15,7 @@ out vec3 FragPos;
 
 void main()
 {
-	gl_Position = ProjMat *  matrix * ViewMat * ModelMat * vec4(position, 1.0);
+	gl_Position = ProjMat *  matrix /** ViewMat*/ * ModelMat * vec4(position, 1.0);
 	//ourColor = vec3(1.0, 1.0, 1.0);
 
 	//FragPos = position;

@@ -144,8 +144,8 @@ int main()
 	//kuModelObject	Model("LAI-WEN-HSIEN-big.surf.stl");
 	//kuModelObject	Model("1.stl");
 
-	kuModelObject		FaceModel("PhantomHead.stl");
-	kuModelObject		BoneModel("kuBone_7d5wf_SG.obj");
+	kuModelObject		FaceModel("kuFace_7d5wf_SG_Center.stl");
+	kuModelObject		BoneModel("kuBone_7d5wf_SG_Center.stl");
 	kuShaderHandler		ModelShaderHandler;
 	kuShaderHandler		ImgShader;
 	kuShaderHandler		AxesShaderHandler;
@@ -184,10 +184,10 @@ int main()
 
 	Mat AxiImg = imread("HSIEH-CHUNG-HUNG-OrthoSlice.to-byte.0000.bmp", 1);
 
-	//ModelMat = glm::rotate(ModelMat, (GLfloat)pi * -90.0f / 180.0f,
-	//					   glm::vec3(1.0f, 0.0f, 0.0f)); // mat, degree, axis. (use radians)
+	ModelMat = glm::rotate(ModelMat, (GLfloat)pi * -90.0f / 180.0f,
+						   glm::vec3(1.0f, 0.0f, 0.0f)); // mat, degree, axis. (use radians)
 	//ModelMat = glm::translate(ModelMat, glm::vec3(0.0f, 0.0f, 20.0f));
-	ModelMat = glm::scale(ModelMat, glm::vec3(0.4f, 0.4f, 0.4f));
+	ModelMat = glm::scale(ModelMat, glm::vec3(0.005f, 0.005f, 0.005f));
 
 	GLfloat *range = new GLfloat[2];
 	glGetFloatv(GL_ALIASED_LINE_WIDTH_RANGE, range);
@@ -237,23 +237,29 @@ int main()
 
 			// Inner object first.
 			glUniform4fv(ObjColorLoc, 1, BoneColorVec);
-			BoneModel.Draw(ModelShaderHandler);
+			BoneModel.Draw(ModelShaderHandler, glm::vec3(0.3f, 0.3f, 0.3f),
+				glm::vec3(0.5f, 0.5f, 0.5f),
+				glm::vec3(0.3f, 0.3f, 0.3f));
+			//BoneModel.Draw(ModelShaderHandler);
 
 			// Draw outside object latter
 			glUniform4fv(ObjColorLoc, 1, FaceColorVec);
-			FaceModel.Draw(ModelShaderHandler);
+			FaceModel.Draw(ModelShaderHandler, glm::vec3(0.3f, 0.3f, 0.3f),
+				glm::vec3(0.5f, 0.5f, 0.5f),
+				glm::vec3(0.3f, 0.3f, 0.3f));
+			//FaceModel.Draw(ModelShaderHandler);
 
 			DrawAxes(AxesShaderHandler, 0.3f, eye);
 
 			glDisable(GL_DEPTH_TEST);
 
-			ImgShader.Use();
-			glUniformMatrix4fv(ImgSceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
-			glUniformMatrix4fv(ImgProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
-			glUniformMatrix4fv(ImgViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
-			glUniformMatrix4fv(ImgModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
-			glUniformMatrix4fv(TransCT2ModelLoc, 1, GL_FALSE, glm::value_ptr(TransCT2Model));
-			DrawImage(AxiImg, ImgShader);
+			//ImgShader.Use();
+			//glUniformMatrix4fv(ImgSceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
+			//glUniformMatrix4fv(ImgProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
+			//glUniformMatrix4fv(ImgViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
+			//glUniformMatrix4fv(ImgModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
+			//glUniformMatrix4fv(TransCT2ModelLoc, 1, GL_FALSE, glm::value_ptr(TransCT2Model));
+			//DrawImage(AxiImg, ImgShader);
 
 			glUseProgram(0);
 		}
@@ -342,8 +348,8 @@ void Init()
 	EyePoseMat[Left]  = GetHMDMatrixPoseEye(vr::Eye_Left);
 	EyePoseMat[Right] = GetHMDMatrixPoseEye(vr::Eye_Right);
 
-	MVPMat[Left]  = HMDProjectionMat[Left]  * EyePoseMat[Left];
-	MVPMat[Right] = HMDProjectionMat[Right] * EyePoseMat[Right];
+	//MVPMat[Left]  = HMDProjectionMat[Left]  * EyePoseMat[Left];
+	//MVPMat[Right] = HMDProjectionMat[Right] * EyePoseMat[Right];
 
 	//WriteMVPMatrixFile("LeftMVPMatrix.txt",  MVPMat[Left]);
 	//WriteMVPMatrixFile("RightMVPMatrix.txt", MVPMat[Right]);

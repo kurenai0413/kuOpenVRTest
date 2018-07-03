@@ -31,11 +31,26 @@ void kuModelObject::Draw(kuShaderHandler shader)
 	}
 }
 
+void kuModelObject::Draw(kuShaderHandler shader, glm::vec3 ambient, glm::vec3 diffuse, glm::vec3 specular)
+{
+	glUniform3f(glGetUniformLocation(shader.ShaderProgramID, "material.ambient"),
+		ambient.r, ambient.g, ambient.b);
+	glUniform3f(glGetUniformLocation(shader.ShaderProgramID, "material.diffuse"),
+		diffuse.r, diffuse.g, diffuse.b);
+	glUniform3f(glGetUniformLocation(shader.ShaderProgramID, "material.specular"),
+		specular.r, specular.g, specular.b);
+
+	for (int i = 0; i < ObjectMeshes.size(); i++)
+	{
+		this->ObjectMeshes[i].Draw(shader);
+	}
+}
+
 void kuModelObject::LoadModel(char * filename)
 {
 	Assimp::Importer	importer;
 
-	cout << "Loading model....." << endl;
+	cout << "Loading model....." << filename << endl;
 
 	const aiScene * scene = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs | 
 														aiProcess_GenNormals );

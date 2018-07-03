@@ -26,6 +26,7 @@ public:
 	~kuModelObject();
 
 	void Draw(kuShaderHandler shader);
+	void Draw(kuShaderHandler shader, glm::vec3 ambient, glm::vec3 diffuse, glm::vec3 specular);
 
 private:
 	vector<kuMesh>		ObjectMeshes;
