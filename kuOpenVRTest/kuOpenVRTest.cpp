@@ -185,8 +185,8 @@ int main()
 	// 不設定ProjMat的值是因為在Init()裡面透過GetHMDMatrixProjectionEye取出Vive的projection matrix
 	// 而且這樣打進shader "matrix"那個location裡面那個轉換矩陣就已經是MVP了....model, view, projection乘一起
 
-	GLfloat FaceColorVec[4] = { 0.745f, 0.447f, 0.235f, 0.5f };
-	GLfloat BoneColorVec[4] = {   1.0f,   1.0f,   1.0f, 1.0f };
+	GLfloat FaceColorVec[4] = { 0.745f, 0.447f, 0.235f, 0.3f };
+	GLfloat BoneColorVec[4] = {   1.0f,   1.0f,   1.0f, 0.5f };
 	GLfloat CubeColorVec[4] = {   1.0f,   0.0f,   0.0f, 1.0f };
 
 	Mat AxiImg = imread("HSIEH-CHUNG-HUNG-OrthoSlice.to-byte.0000.bmp", 1);
@@ -194,7 +194,9 @@ int main()
 	ModelMat = glm::rotate(ModelMat, (GLfloat)pi * -90.0f / 180.0f,
 						   glm::vec3(1.0f, 0.0f, 0.0f)); // mat, degree, axis. (use radians)
 	//ModelMat = glm::translate(ModelMat, glm::vec3(0.0f, 0.0f, 20.0f));
-	ModelMat = glm::scale(ModelMat, glm::vec3(0.005f, 0.005f, 0.005f));
+	//ModelMat = glm::scale(ModelMat, glm::vec3(0.005f, 0.005f, 0.005f));
+	float modelScale = 0.005f;
+	ModelMat = glm::scale(ModelMat, glm::vec3(modelScale, modelScale, modelScale));
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -238,6 +240,14 @@ int main()
 			glUniformMatrix4fv(ModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
 			glUniform3fv(CamPosLoc, 1, glm::value_ptr(CameraPos));
 
+			glUniform4fv(ObjColorLoc, 1, CubeColorVec);
+			DrawCube(ModelShaderHandler, eye,
+				5.25f, -10.5f, 10.5f,
+				glm::vec3(0.3f, 0.3f, 0.3f),
+				glm::vec3(1.0f, 1.0f, 1.0f),
+				glm::vec3(0.3f, 0.3f, 0.3f),
+				3.0f);
+
 			// Inner object first.
 			glUniform4fv(ObjColorLoc, 1, BoneColorVec);
 			BoneModel.Draw(ModelShaderHandler, glm::vec3(0.3f, 0.3f, 0.3f),
@@ -251,17 +261,9 @@ int main()
 						   glm::vec3(0.5f, 0.5f, 0.5f),
 						   glm::vec3(0.3f, 0.3f, 0.3f));
 			//FaceModel.Draw(ModelShaderHandler);
-
-			glUniform4fv(ObjColorLoc, 1, CubeColorVec);
-			DrawCube(ModelShaderHandler, eye,
-				5.25f, -10.5f, 10.5f,
-				glm::vec3(0.3f, 0.3f, 0.3f),
-				glm::vec3(1.0f, 1.0f, 1.0f),
-				glm::vec3(0.3f, 0.3f, 0.3f),
-				3.0f);
 			#pragma endregion
 
-			DrawAxes(AxesShaderHandler, 0.3f, eye);
+			//DrawAxes(AxesShaderHandler, 0.3f, eye);
 			DrawPath(AxesShaderHandler, eye);
 
 			glDisable(GL_DEPTH_TEST);
@@ -273,7 +275,7 @@ int main()
 			glUniformMatrix4fv(ImgViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
 			glUniformMatrix4fv(ImgModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
 			glUniformMatrix4fv(TransCT2ModelLoc, 1, GL_FALSE, glm::value_ptr(TransCT2Model));
-			DrawImage(AxiImg, ImgShader);
+			//DrawImage(AxiImg, ImgShader);
 			#pragma endregion
 
 			glUseProgram(0);
@@ -829,7 +831,7 @@ void DrawPath(kuShaderHandler axesShader, int eyeSide)
 	const GLfloat SurgicalPathVertices[]
 		= {
 		// Position				// Color
-		0.0f, 0.0f, 0.0f,		1.0f, 0.0f, 1.0f,
+		0.02, 0.04, 0.04,		1.0f, 0.0f, 1.0f,
 		1.5f, 3.0f, 3.0f,		1.0f, 0.0f, 1.0f
 	};
 
