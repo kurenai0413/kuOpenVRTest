@@ -65,7 +65,7 @@ Matrix4		HMDProjectionMat[2];
 Matrix4		EyePoseMat[2];  
 Matrix4		MVPMat[2];
 
-glm::vec3 CameraPos   = glm::vec3(0.0f, 0.0f, 200.0f);
+glm::vec3 CameraPos   /*= glm::vec3(0.0f, 0.0f, 200.0f)*/;
 glm::vec3 CameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
 glm::vec3 CameraUp    = glm::vec3(0.0f, 1.0f, 0.0f);
 
@@ -79,30 +79,30 @@ std::string			getHMDString(vr::IVRSystem* pHmd, vr::TrackedDeviceIndex_t unDevic
 								 vr::TrackedDeviceProperty prop, 
 								 vr::TrackedPropertyError* peError = nullptr);
 
-Matrix4 GetHMDMatrixProjectionEye(vr::Hmd_Eye nEye);
-Matrix4 GetHMDMatrixPoseEye(vr::Hmd_Eye nEye);
+Matrix4				GetHMDMatrixProjectionEye(vr::Hmd_Eye nEye);
+Matrix4				GetHMDMatrixPoseEye(vr::Hmd_Eye nEye);
 
-void WriteProjectionMatrixFile(char * Filename, vr::HmdMatrix44_t ProjMat);
-void WriteEyePoseMatrixFile(char * Filename, vr::HmdMatrix34_t PoseMat);
-void WriteMVPMatrixFile(char * Filename, Matrix4 matMVP);
-void SetMatrix(vr::HmdMatrix44_t HMDProjMat, Matrix4& ProjMat);
-void SetMatrix(vr::HmdMatrix34_t HMDEyePoseMat, Matrix4& PoseMat);
-void CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc &BufferDesc);
+void				WriteProjectionMatrixFile(char * Filename, vr::HmdMatrix44_t ProjMat);
+void				WriteEyePoseMatrixFile(char * Filename, vr::HmdMatrix34_t PoseMat);
+void				WriteMVPMatrixFile(char * Filename, Matrix4 matMVP);
+void				SetMatrix(vr::HmdMatrix44_t HMDProjMat, Matrix4& ProjMat);
+void				SetMatrix(vr::HmdMatrix34_t HMDEyePoseMat, Matrix4& PoseMat);
+void				CreateFrameBuffer(int BufferWidth, int BufferHeight, FrameBufferDesc &BufferDesc);
 
-GLuint			CreateTexturebyImage(Mat Img);
+GLuint				CreateTexturebyImage(Mat Img);
 
-void			key_callback(GLFWwindow * window, int key, int scancode, int action, int mode);
-void			mouse_callback(GLFWwindow * window, double xPos, double yPos);
-void			do_movement();
-Matrix4			ConvertSteamVRMatrixToMatrix4(const vr::HmdMatrix34_t &matPose);
+void				key_callback(GLFWwindow * window, int key, int scancode, int action, int mode);
+void				mouse_callback(GLFWwindow * window, double xPos, double yPos);
+void				do_movement();
+Matrix4				ConvertSteamVRMatrixToMatrix4(const vr::HmdMatrix34_t &matPose);
 
-void			DrawImage(Mat Img, kuShaderHandler ImgShader);
-void			DrawAxes(kuShaderHandler axesShader, float length, int eyeSide);
-void			DrawPath(kuShaderHandler axesShader, int eyeSide);
-void			DrawCube(kuShaderHandler cubeShader, int eyeSide, 
-						 float posX, float posY, float posZ,
-						 glm::vec3 ambient, glm::vec3 diffuse, glm::vec3 specular, 
-						 float cubeSize = 0.5);
+void				DrawImage(Mat Img, kuShaderHandler ImgShader);
+void				DrawAxes(kuShaderHandler axesShader, float length, int eyeSide);
+void				DrawPath(kuShaderHandler axesShader, int eyeSide);
+void				DrawCube(kuShaderHandler cubeShader, int eyeSide, 
+							 float posX, float posY, float posZ,
+							 glm::vec3 ambient, glm::vec3 diffuse, glm::vec3 specular, 
+							 float cubeSize = 0.5);
 
 bool			firstMouse = true;
 
@@ -142,51 +142,43 @@ GLuint ImgIndices[]
 	1, 2, 3
 };
 
-
 int main()
 {
 	Init();
-	
-	//kuModelObject	Model("LAI-WEN-HSIEN-big.surf.stl");
-	//kuModelObject	Model("1.stl");
 
 	kuModelObject		FaceModel("kuFace_7d5wf_SG_Center.stl");
 	kuModelObject		BoneModel("kuBone_7d5wf_SG_Center.stl");
-	kuShaderHandler		ModelShaderHandler;
-	kuShaderHandler		ImgShader;
-	kuShaderHandler		AxesShaderHandler;
-	
-	ModelShaderHandler.Load("ModelVertexShader.vert", "ModelFragmentShader.frag");
-	ImgShader.Load("ImgVertexShader.vert", "ImgFragmentShader.frag");
-	AxesShaderHandler.Load("AxesVertexShader.vert", "AxesFragmentShader.frag");
+	kuShaderHandler		ModelShaderHandler("ModelVertexShader.vert", "ModelFragmentShader.frag");
+	kuShaderHandler		ImgShader("ImgVertexShader.vert", "ImgFragmentShader.frag");
+	kuShaderHandler		AxesShaderHandler("AxesVertexShader.vert", "AxesFragmentShader.frag");
 
 	TransCT2Model = glm::translate(TransCT2Model, glm::vec3(-128.249, -281.249, -287));
 
 	// Set model shader uniform location
-	SceneMatrixLocation = glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "matrix");
-	ProjMatLoc			= glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ProjMat");
-	ViewMatLoc			= glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ViewMat");
-	ModelMatLoc			= glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ModelMat");
-	CamPosLoc			= glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "CamPos");
-	ObjColorLoc			= glGetUniformLocation(ModelShaderHandler.ShaderProgramID, "ObjColor");
+	SceneMatrixLocation	   = glGetUniformLocation(ModelShaderHandler.GetShaderProgramID(), "matrix");
+	ProjMatLoc			   = glGetUniformLocation(ModelShaderHandler.GetShaderProgramID(), "ProjMat");
+	ViewMatLoc			   = glGetUniformLocation(ModelShaderHandler.GetShaderProgramID(), "ViewMat");
+	ModelMatLoc			   = glGetUniformLocation(ModelShaderHandler.GetShaderProgramID(), "ModelMat");
+	CamPosLoc			   = glGetUniformLocation(ModelShaderHandler.GetShaderProgramID(), "CamPos");
+	ObjColorLoc			   = glGetUniformLocation(ModelShaderHandler.GetShaderProgramID(), "ObjColor");
 
 	// Set image shader uniform location
-	ImgSceneMatrixLocation = glGetUniformLocation(ImgShader.ShaderProgramID, "matrix");
-	ImgProjMatLoc		   = glGetUniformLocation(ImgShader.ShaderProgramID, "ProjMat");
-	ImgViewMatLoc		   = glGetUniformLocation(ImgShader.ShaderProgramID, "ViewMat");
-	ImgModelMatLoc		   = glGetUniformLocation(ImgShader.ShaderProgramID, "ModelMat");
-	TransCT2ModelLoc	   = glGetUniformLocation(ImgShader.ShaderProgramID, "TransCT2Model");
+	ImgSceneMatrixLocation = glGetUniformLocation(ImgShader.GetShaderProgramID(), "matrix");
+	ImgProjMatLoc		   = glGetUniformLocation(ImgShader.GetShaderProgramID(), "ProjMat");
+	ImgViewMatLoc		   = glGetUniformLocation(ImgShader.GetShaderProgramID(), "ViewMat");
+	ImgModelMatLoc		   = glGetUniformLocation(ImgShader.GetShaderProgramID(), "ModelMat");
+	TransCT2ModelLoc	   = glGetUniformLocation(ImgShader.GetShaderProgramID(), "TransCT2Model");
 
 	// Set coordinate axes shader uniform location
-	AxesViewMatLoc  = glGetUniformLocation(AxesShaderHandler.ShaderProgramID, "ViewMat");
-	AxesProjMatLoc  = glGetUniformLocation(AxesShaderHandler.ShaderProgramID, "ProjMat");
-	AxesModelMatLoc = glGetUniformLocation(AxesShaderHandler.ShaderProgramID, "ModelMat");
+	AxesViewMatLoc         = glGetUniformLocation(AxesShaderHandler.GetShaderProgramID(), "ViewMat");
+	AxesProjMatLoc         = glGetUniformLocation(AxesShaderHandler.GetShaderProgramID(), "ProjMat");
+	AxesModelMatLoc        = glGetUniformLocation(AxesShaderHandler.GetShaderProgramID(), "ModelMat");
 
 	// 不設定ProjMat的值是因為在Init()裡面透過GetHMDMatrixProjectionEye取出Vive的projection matrix
 	// 而且這樣打進shader "matrix"那個location裡面那個轉換矩陣就已經是MVP了....model, view, projection乘一起
 
-	GLfloat FaceColorVec[4] = { 0.745f, 0.447f, 0.235f, 0.3f };
-	GLfloat BoneColorVec[4] = {   1.0f,   1.0f,   1.0f, 0.5f };
+	GLfloat FaceColorVec[4] = { 0.745f, 0.447f, 0.235f, 0.5f };
+	GLfloat BoneColorVec[4] = {   1.0f,   1.0f,   1.0f, 1.0f };
 	GLfloat CubeColorVec[4] = {   1.0f,   0.0f,   0.0f, 1.0f };
 
 	Mat AxiImg = imread("HSIEH-CHUNG-HUNG-OrthoSlice.to-byte.0000.bmp", 1);
@@ -195,12 +187,12 @@ int main()
 						   glm::vec3(1.0f, 0.0f, 0.0f)); // mat, degree, axis. (use radians)
 	//ModelMat = glm::translate(ModelMat, glm::vec3(0.0f, 0.0f, 20.0f));
 	//ModelMat = glm::scale(ModelMat, glm::vec3(0.005f, 0.005f, 0.005f));
-	float modelScale = 0.005f;
+	float modelScale = 0.001f;
 	ModelMat = glm::scale(ModelMat, glm::vec3(modelScale, modelScale, modelScale));
 
 	while (!glfwWindowShouldClose(window))
 	{
-		GLfloat currFrameT = glfwGetTime();
+		GLfloat currFrameT = (GLfloat)glfwGetTime();
 		deltaTime = currFrameT - lastFrameT;
 		lastFrameT = currFrameT;
 
@@ -212,6 +204,7 @@ int main()
 		vr::VRCompositor()->WaitGetPoses(trackedDevicePose, vr::k_unMaxTrackedDeviceCount, nullptr, 0);
 
 		Matrix4 HMDPoseMat = ConvertSteamVRMatrixToMatrix4(trackedDevicePose[0].mDeviceToAbsoluteTracking);
+		CameraPos = glm::vec3(HMDPoseMat.m[12], HMDPoseMat.m[13], HMDPoseMat.m[14]);
 		HMDPoseMat.invert();
 
 		MVPMat[Left]  = HMDProjectionMat[Left] * EyePoseMat[Left] * HMDPoseMat;
@@ -222,7 +215,8 @@ int main()
 			glBindFramebuffer(GL_FRAMEBUFFER, FrameBufferID[eye]);
 			glViewport(0, 0, framebufferWidth, framebufferHeight);
 			
-			glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+			//glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+			glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 			glEnable(GL_DEPTH_TEST);		
@@ -257,9 +251,9 @@ int main()
 
 			// Draw outside object latter
 			glUniform4fv(ObjColorLoc, 1, FaceColorVec);
-			FaceModel.Draw(ModelShaderHandler, glm::vec3(0.3f, 0.3f, 0.3f),
-						   glm::vec3(0.5f, 0.5f, 0.5f),
-						   glm::vec3(0.3f, 0.3f, 0.3f));
+			//FaceModel.Draw(ModelShaderHandler, glm::vec3(0.3f, 0.3f, 0.3f),
+			//			   glm::vec3(0.5f, 0.5f, 0.5f),
+			//			   glm::vec3(0.3f, 0.3f, 0.3f));
 			//FaceModel.Draw(ModelShaderHandler);
 			#pragma endregion
 
@@ -356,9 +350,6 @@ void Init()
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	vr::HmdMatrix44_t	ProjMat[2];
-	vr::HmdMatrix34_t	PoseMat[2];
 
 	HMDProjectionMat[Left]  = GetHMDMatrixProjectionEye(vr::Eye_Left);
 	HMDProjectionMat[Right] = GetHMDMatrixProjectionEye(vr::Eye_Right);
@@ -664,18 +655,18 @@ void mouse_callback(GLFWwindow * window, double xPos, double yPos)
 {
 	if (firstMouse)
 	{
-		LastXPos = xPos;
-		LastYPos = yPos;
+		LastXPos = (GLfloat)xPos;
+		LastYPos = (GLfloat)yPos;
 
 		firstMouse = false;
 	}
 
-	GLfloat xOffset = xPos - LastXPos;
-	GLfloat yOffset = yPos - LastYPos;
-	LastXPos = xPos;
-	LastYPos = yPos;
+	GLfloat xOffset = (GLfloat)xPos - LastXPos;
+	GLfloat yOffset = (GLfloat)yPos - LastYPos;
+	LastXPos = (GLfloat)xPos;
+	LastYPos = (GLfloat)yPos;
 
-	GLfloat sensitivity = 0.05;
+	GLfloat sensitivity = 0.05f;
 	xOffset *= sensitivity;
 	yOffset *= sensitivity;
 
@@ -974,11 +965,11 @@ void DrawCube(kuShaderHandler cubeShader, int eyeSide,
 
 	cubeShader.Use();
 
-	glUniform3f(glGetUniformLocation(cubeShader.ShaderProgramID, "material.ambient"),
+	glUniform3f(glGetUniformLocation(cubeShader.GetShaderProgramID(), "material.ambient"),
 		ambient.r, ambient.g, ambient.b);
-	glUniform3f(glGetUniformLocation(cubeShader.ShaderProgramID, "material.diffuse"),
+	glUniform3f(glGetUniformLocation(cubeShader.GetShaderProgramID(), "material.diffuse"),
 		diffuse.r, diffuse.g, diffuse.b);
-	glUniform3f(glGetUniformLocation(cubeShader.ShaderProgramID, "material.specular"),
+	glUniform3f(glGetUniformLocation(cubeShader.GetShaderProgramID(), "material.specular"),
 		specular.r, specular.g, specular.b);
 
 	//glUniformMatrix4fv(AxesModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
