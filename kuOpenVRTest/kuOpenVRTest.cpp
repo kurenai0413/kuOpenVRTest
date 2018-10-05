@@ -161,35 +161,34 @@ const GLuint WIDTH = 800, HEIGHT = 600;
 
 int main()
 {
-	Init();
-
+	//Init();
 	// Init GLFW
-	//glfwInit();
-	//glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	//glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	//glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	//glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+	glfwInit();
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-	//GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "LearnOpenGL", nullptr, nullptr); // Windowed
-	//glfwMakeContextCurrent(window);
+	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "LearnOpenGL", nullptr, nullptr); // Windowed
+	glfwMakeContextCurrent(window);
 
-	//// Initialize GLEW to setup the OpenGL Function pointers
-	//glewExperimental = GL_TRUE;
-	//glewInit();
+	// Initialize GLEW to setup the OpenGL Function pointers
+	glewExperimental = GL_TRUE;
+	glewInit();
 
-	//// Define the viewport dimensions
-	//glViewport(0, 0, WIDTH, HEIGHT);
-	//
-	//// Set OpenGL options
-	//glEnable(GL_CULL_FACE);
-	//glEnable(GL_BLEND);
-	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	// Define the viewport dimensions
+	glViewport(0, 0, WIDTH, HEIGHT);
+	
+	// Set OpenGL options
+	glEnable(GL_CULL_FACE);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	//kuShaderHandler		TextShaderHandler;
-	//TextShaderHandler.Load("TextShader.vert", "TextShader.frag");
-	//glm::mat4 projection = glm::ortho(0.0f, static_cast<GLfloat>(WIDTH), 0.0f, static_cast<GLfloat>(HEIGHT));
-	//TextShaderHandler.Use();
-	//glUniformMatrix4fv(glGetUniformLocation(TextShaderHandler.ShaderProgramID, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+	kuShaderHandler		TextShaderHandler;
+	TextShaderHandler.Load("TextShader.vert", "TextShader.frag");
+	glm::mat4 projection = glm::ortho(0.0f, static_cast<GLfloat>(WIDTH), 0.0f, static_cast<GLfloat>(HEIGHT));
+	TextShaderHandler.Use();
+	glUniformMatrix4fv(glGetUniformLocation(TextShaderHandler.ShaderProgramID, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
 	#pragma region // FreeType text setting //
 	// FreeType
@@ -252,17 +251,22 @@ int main()
 	FT_Done_FreeType(ft);
 	#pragma endregion
 
-	kuModelObject		FaceModel("kuFace_7d5wf_SG_Center.stl");
-	kuModelObject		BoneModel("kuBone_7d5wf_SG_Center.stl");
+	//kuModelObject	Model("LAI-WEN-HSIEN-big.surf.stl");
+	//kuModelObject	Model("1.stl");
 
-	kuShaderHandler		ModelShaderHandler;
+	//kuModelObject		FaceModel("kuFace_7d5wf_SG_Center.stl");
+	//kuModelObject		BoneModel("kuBone_7d5wf_SG_Center.stl");
+
+	/*kuShaderHandler		ModelShaderHandler;
 	kuShaderHandler		ImgShader;
-	kuShaderHandler		AxesShaderHandler;
+	kuShaderHandler		AxesShaderHandler;*/
 	
-	ModelShaderHandler.Load("ModelVertexShader.vert", "ModelFragmentShader.frag");
-	ImgShader.Load("ImgVertexShader.vert", "ImgFragmentShader.frag");
-	AxesShaderHandler.Load("AxesVertexShader.vert", "AxesFragmentShader.frag");
+
+	//ModelShaderHandler.Load("ModelVertexShader.vert", "ModelFragmentShader.frag");
+	//ImgShader.Load("ImgVertexShader.vert", "ImgFragmentShader.frag");
+	//AxesShaderHandler.Load("AxesVertexShader.vert", "AxesFragmentShader.frag");
 	
+	/*
 	TransCT2Model = glm::translate(TransCT2Model, glm::vec3(-128.249, -281.249, -287));
 
 	// Set model shader uniform location
@@ -292,39 +296,40 @@ int main()
 	GLfloat BoneColorVec[4] = {   1.0f,   1.0f,   1.0f, 0.5f };
 	GLfloat CubeColorVec[4] = {   1.0f,   0.0f,   0.0f, 1.0f };
 
-	//Mat AxiImg = imread("HSIEH-CHUNG-HUNG-OrthoSlice.to-byte.0000.bmp", 1);
+	Mat AxiImg = imread("HSIEH-CHUNG-HUNG-OrthoSlice.to-byte.0000.bmp", 1);
 
 	ModelMat = glm::rotate(ModelMat, (GLfloat)pi * -90.0f / 180.0f,
 						   glm::vec3(1.0f, 0.0f, 0.0f)); // mat, degree, axis. (use radians)
 	//ModelMat = glm::translate(ModelMat, glm::vec3(0.0f, 0.0f, 20.0f));
 	//ModelMat = glm::scale(ModelMat, glm::vec3(0.005f, 0.005f, 0.005f));
-	float modelScale = 0.003f;
+	float modelScale = 0.005f;
 	ModelMat = glm::scale(ModelMat, glm::vec3(modelScale, modelScale, modelScale));
+	*/
 
 	// Configure VAO/VBO for texture quads
-	//glGenVertexArrays(1, &VAO);
-	//glGenBuffers(1, &VBO);
-	//glBindVertexArray(VAO);
-	//glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	//glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
-	//glEnableVertexAttribArray(0);
-	//glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), 0);
-	//glBindBuffer(GL_ARRAY_BUFFER, 0);
-	//glBindVertexArray(0);
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+	glBindVertexArray(VAO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), 0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
 
 	while (!glfwWindowShouldClose(window))
 	{
-		//// Check and call events
-		//glfwPollEvents();
+		// Check and call events
+		glfwPollEvents();
 
-		//// Clear the colorbuffer
-		//glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-		//glClear(GL_COLOR_BUFFER_BIT);
+		// Clear the colorbuffer
+		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
 
-		//RenderText(TextShaderHandler, "This is sample text", 25.0f, 25.0f, 1.0f, glm::vec3(0.5, 0.8f, 0.2f));
-		//RenderText(TextShaderHandler, "(C) LearnOpenGL.com", 540.0f, 570.0f, 0.5f, glm::vec3(0.3, 0.7f, 0.9f));
+		RenderText(TextShaderHandler, "This is sample text", 25.0f, 25.0f, 1.0f, glm::vec3(0.5, 0.8f, 0.2f));
+		RenderText(TextShaderHandler, "(C) LearnOpenGL.com", 540.0f, 570.0f, 0.5f, glm::vec3(0.3, 0.7f, 0.9f));
 
-		
+		/*
 		GLfloat currFrameT = glfwGetTime();
 		deltaTime = currFrameT - lastFrameT;
 		lastFrameT = currFrameT;
@@ -357,43 +362,45 @@ int main()
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-			//RenderText(TextShaderHandler, "This is sample text", 25.0f, 25.0f, 1.0f, glm::vec3(0.5, 0.8f, 0.2f));
-			//RenderText(TextShaderHandler, "(C) LearnOpenGL.com", 540.0f, 570.0f, 0.5f, glm::vec3(0.3, 0.7f, 0.9f));
+
+			RenderText(TextShaderHandler, "This is sample text", 25.0f, 25.0f, 1.0f, glm::vec3(0.5, 0.8f, 0.2f));
+			RenderText(TextShaderHandler, "(C) LearnOpenGL.com", 540.0f, 570.0f, 0.5f, glm::vec3(0.3, 0.7f, 0.9f));
+
 			
 			#pragma region // Render virtual model to the frame buffer //
-			ModelShaderHandler.Use();
-			glUniformMatrix4fv(SceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
-			glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
-			glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
-			glUniformMatrix4fv(ModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
-			glUniform3fv(CamPosLoc, 1, glm::value_ptr(CameraPos));
+			//ModelShaderHandler.Use();
+			//glUniformMatrix4fv(SceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
+			//glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
+			//glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
+			//glUniformMatrix4fv(ModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
+			//glUniform3fv(CamPosLoc, 1, glm::value_ptr(CameraPos));
 
-			glUniform4fv(ObjColorLoc, 1, CubeColorVec);
-			DrawCube(ModelShaderHandler, eye,
-				5.25f, -10.5f, 10.5f,
-				glm::vec3(0.3f, 0.3f, 0.3f),
-				glm::vec3(1.0f, 1.0f, 1.0f),
-				glm::vec3(0.3f, 0.3f, 0.3f),
-				3.0f);
+			//glUniform4fv(ObjColorLoc, 1, CubeColorVec);
+			//DrawCube(ModelShaderHandler, eye,
+			//	5.25f, -10.5f, 10.5f,
+			//	glm::vec3(0.3f, 0.3f, 0.3f),
+			//	glm::vec3(1.0f, 1.0f, 1.0f),
+			//	glm::vec3(0.3f, 0.3f, 0.3f),
+			//	3.0f);
 
-			// Inner object first.
-			glUniform4fv(ObjColorLoc, 1, BoneColorVec);
-			BoneModel.Draw(ModelShaderHandler, glm::vec3(0.3f, 0.3f, 0.3f),
-						   glm::vec3(0.5f, 0.5f, 0.5f),
-						   glm::vec3(0.3f, 0.3f, 0.3f));
-			//BoneModel.Draw(ModelShaderHandler);
+			//// Inner object first.
+			//glUniform4fv(ObjColorLoc, 1, BoneColorVec);
+			//BoneModel.Draw(ModelShaderHandler, glm::vec3(0.3f, 0.3f, 0.3f),
+			//			   glm::vec3(0.5f, 0.5f, 0.5f),
+			//			   glm::vec3(0.3f, 0.3f, 0.3f));
+			////BoneModel.Draw(ModelShaderHandler);
 
-			// Draw outside object latter
-			glUniform4fv(ObjColorLoc, 1, FaceColorVec);
-			FaceModel.Draw(ModelShaderHandler, glm::vec3(0.3f, 0.3f, 0.3f),
-						   glm::vec3(0.5f, 0.5f, 0.5f),
-						   glm::vec3(0.3f, 0.3f, 0.3f));
-			//FaceModel.Draw(ModelShaderHandler);
+			//// Draw outside object latter
+			//glUniform4fv(ObjColorLoc, 1, FaceColorVec);
+			//FaceModel.Draw(ModelShaderHandler, glm::vec3(0.3f, 0.3f, 0.3f),
+			//			   glm::vec3(0.5f, 0.5f, 0.5f),
+			//			   glm::vec3(0.3f, 0.3f, 0.3f));
+			////FaceModel.Draw(ModelShaderHandler);
 			#pragma endregion
 			
 
 			//DrawAxes(AxesShaderHandler, 0.3f, eye);
-			DrawPath(AxesShaderHandler, eye);
+			//DrawPath(AxesShaderHandler, eye);
 
 			glDisable(GL_DEPTH_TEST);
 
@@ -404,7 +411,7 @@ int main()
 			//glUniformMatrix4fv(ImgViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
 			//glUniformMatrix4fv(ImgModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
 			//glUniformMatrix4fv(TransCT2ModelLoc, 1, GL_FALSE, glm::value_ptr(TransCT2Model));
-			//DrawImage(AxiImg, ImgShader);
+			////DrawImage(AxiImg, ImgShader);
 			#pragma endregion
 
 			glUseProgram(0);
@@ -424,6 +431,7 @@ int main()
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glBlitFramebuffer(0, 0, framebufferWidth, framebufferHeight, 0, 0, 640, 720, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, GL_NONE);
+		*/
 
 		glfwSwapBuffers(window);
 	}
