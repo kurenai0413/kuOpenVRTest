@@ -74,6 +74,7 @@
     <Import Project="..\..\..\..\..\Libraries\PropertyFiles\OpenVR_x64.props" />
     <Import Project="..\..\..\..\..\Libraries\PropertyFiles\OpenCV310_x64.props" />
     <Import Project="..\..\..\..\..\Libraries\PropertyFiles\Assimp410_x64.props" />
+    <Import Project="..\..\..\..\..\Libraries\PropertyFiles\FreeType_x64.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
