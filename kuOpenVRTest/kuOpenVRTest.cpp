@@ -12,15 +12,11 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <OpenVR.h>
 #include <opencv2/opencv.hpp>
-
-#include <>
-
+#include <ft2build.h>
+#include FT_FREETYPE_H
 
 #include "kuShaderHandler.h"
 #include "kuModelObject.h"
-
-
-
 
 #include "vectors.h"
 #include "Matrices.h"
@@ -80,6 +76,8 @@ bool			keyPressArray[1024];
 void				Init();
 GLFWwindow		*	initOpenGL(int width, int height, const std::string& title, GLFWkeyfun cbfun);
 vr::IVRSystem	*	initOpenVR(uint32_t& hmdWidth, uint32_t& hmdHeight);
+//void				initFT(char * fontFile);
+
 std::string			getHMDString(vr::IVRSystem* pHmd, vr::TrackedDeviceIndex_t unDevice, 
 								 vr::TrackedDeviceProperty prop, 
 								 vr::TrackedPropertyError* peError = nullptr);
@@ -108,6 +106,7 @@ void			DrawCube(kuShaderHandler cubeShader, int eyeSide,
 						 float posX, float posY, float posZ,
 						 glm::vec3 ambient, glm::vec3 diffuse, glm::vec3 specular, 
 						 float cubeSize = 0.5);
+void			RenderText(kuShaderHandler &shader, std::string text, GLfloat x, GLfloat y, GLfloat scale, glm::vec3 color);
 
 bool			firstMouse = true;
 
@@ -147,24 +146,127 @@ GLuint ImgIndices[]
 	1, 2, 3
 };
 
+/// Holds all state information relevant to a character as loaded using FreeType
+struct Character {
+	GLuint TextureID;   // ID handle of the glyph texture
+	glm::ivec2 Size;    // Size of glyph
+	glm::ivec2 Bearing;  // Offset from baseline to left/top of glyph
+	GLuint Advance;    // Horizontal offset to advance to next glyph
+};
+std::map<GLchar, Character> Characters;
+GLuint VAO, VBO;
+
+// Properties
+const GLuint WIDTH = 800, HEIGHT = 600;
 
 int main()
 {
-	Init();
+	//Init();
+	// Init GLFW
+	glfwInit();
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+
+	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "LearnOpenGL", nullptr, nullptr); // Windowed
+	glfwMakeContextCurrent(window);
+
+	// Initialize GLEW to setup the OpenGL Function pointers
+	glewExperimental = GL_TRUE;
+	glewInit();
+
+	// Define the viewport dimensions
+	glViewport(0, 0, WIDTH, HEIGHT);
 	
+	// Set OpenGL options
+	glEnable(GL_CULL_FACE);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	kuShaderHandler		TextShaderHandler;
+	TextShaderHandler.Load("TextShader.vert", "TextShader.frag");
+	glm::mat4 projection = glm::ortho(0.0f, static_cast<GLfloat>(WIDTH), 0.0f, static_cast<GLfloat>(HEIGHT));
+	TextShaderHandler.Use();
+	glUniformMatrix4fv(glGetUniformLocation(TextShaderHandler.ShaderProgramID, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+	#pragma region // FreeType text setting //
+	// FreeType
+	FT_Library ft;
+	// All functions return a value different than 0 whenever an error occurred
+	if (FT_Init_FreeType(&ft))
+		std::cout << "ERROR::FREETYPE: Could not init FreeType Library" << std::endl;
+
+	// Load font as face
+	FT_Face face;
+	if (FT_New_Face(ft, "fonts/arial.ttf", 0, &face))
+		std::cout << "ERROR::FREETYPE: Failed to load font" << std::endl;
+	// Set size to load glyphs as
+	FT_Set_Pixel_Sizes(face, 0, 48);
+
+	// Disable byte-alignment restriction
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+	// Load first 128 characters of ASCII set
+	for (GLubyte c = 0; c < 128; c++)
+	{
+		// Load character glyph 
+		if (FT_Load_Char(face, c, FT_LOAD_RENDER))
+		{
+			std::cout << "ERROR::FREETYTPE: Failed to load Glyph" << std::endl;
+			continue;
+		}
+		// Generate texture
+		GLuint texture;
+		glGenTextures(1, &texture);
+		glBindTexture(GL_TEXTURE_2D, texture);
+		glTexImage2D(
+			GL_TEXTURE_2D,
+			0,
+			GL_RED,
+			face->glyph->bitmap.width,
+			face->glyph->bitmap.rows,
+			0,
+			GL_RED,
+			GL_UNSIGNED_BYTE,
+			face->glyph->bitmap.buffer
+		);
+		// Set texture options
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		// Now store character for later use
+		Character character = {
+			texture,
+			glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
+			glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
+			face->glyph->advance.x
+		};
+		Characters.insert(std::pair<GLchar, Character>(c, character));
+	}
+	glBindTexture(GL_TEXTURE_2D, 0);
+	// Destroy FreeType once we're finished
+	FT_Done_Face(face);
+	FT_Done_FreeType(ft);
+	#pragma endregion
+
 	//kuModelObject	Model("LAI-WEN-HSIEN-big.surf.stl");
 	//kuModelObject	Model("1.stl");
 
-	kuModelObject		FaceModel("kuFace_7d5wf_SG_Center.stl");
-	kuModelObject		BoneModel("kuBone_7d5wf_SG_Center.stl");
-	kuShaderHandler		ModelShaderHandler;
-	kuShaderHandler		ImgShader;
-	kuShaderHandler		AxesShaderHandler;
-	
-	ModelShaderHandler.Load("ModelVertexShader.vert", "ModelFragmentShader.frag");
-	ImgShader.Load("ImgVertexShader.vert", "ImgFragmentShader.frag");
-	AxesShaderHandler.Load("AxesVertexShader.vert", "AxesFragmentShader.frag");
+	//kuModelObject		FaceModel("kuFace_7d5wf_SG_Center.stl");
+	//kuModelObject		BoneModel("kuBone_7d5wf_SG_Center.stl");
 
+	/*kuShaderHandler		ModelShaderHandler;
+	kuShaderHandler		ImgShader;
+	kuShaderHandler		AxesShaderHandler;*/
+	
+
+	//ModelShaderHandler.Load("ModelVertexShader.vert", "ModelFragmentShader.frag");
+	//ImgShader.Load("ImgVertexShader.vert", "ImgFragmentShader.frag");
+	//AxesShaderHandler.Load("AxesVertexShader.vert", "AxesFragmentShader.frag");
+	
+	/*
 	TransCT2Model = glm::translate(TransCT2Model, glm::vec3(-128.249, -281.249, -287));
 
 	// Set model shader uniform location
@@ -202,9 +304,32 @@ int main()
 	//ModelMat = glm::scale(ModelMat, glm::vec3(0.005f, 0.005f, 0.005f));
 	float modelScale = 0.005f;
 	ModelMat = glm::scale(ModelMat, glm::vec3(modelScale, modelScale, modelScale));
+	*/
+
+	// Configure VAO/VBO for texture quads
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+	glBindVertexArray(VAO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), 0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
 
 	while (!glfwWindowShouldClose(window))
 	{
+		// Check and call events
+		glfwPollEvents();
+
+		// Clear the colorbuffer
+		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		RenderText(TextShaderHandler, "This is sample text", 25.0f, 25.0f, 1.0f, glm::vec3(0.5, 0.8f, 0.2f));
+		RenderText(TextShaderHandler, "(C) LearnOpenGL.com", 540.0f, 570.0f, 0.5f, glm::vec3(0.3, 0.7f, 0.9f));
+
+		/*
 		GLfloat currFrameT = glfwGetTime();
 		deltaTime = currFrameT - lastFrameT;
 		lastFrameT = currFrameT;
@@ -237,50 +362,56 @@ int main()
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+
+			RenderText(TextShaderHandler, "This is sample text", 25.0f, 25.0f, 1.0f, glm::vec3(0.5, 0.8f, 0.2f));
+			RenderText(TextShaderHandler, "(C) LearnOpenGL.com", 540.0f, 570.0f, 0.5f, glm::vec3(0.3, 0.7f, 0.9f));
+
+			
 			#pragma region // Render virtual model to the frame buffer //
-			ModelShaderHandler.Use();
-			glUniformMatrix4fv(SceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
-			glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
-			glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
-			glUniformMatrix4fv(ModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
-			glUniform3fv(CamPosLoc, 1, glm::value_ptr(CameraPos));
+			//ModelShaderHandler.Use();
+			//glUniformMatrix4fv(SceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
+			//glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
+			//glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
+			//glUniformMatrix4fv(ModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
+			//glUniform3fv(CamPosLoc, 1, glm::value_ptr(CameraPos));
 
-			glUniform4fv(ObjColorLoc, 1, CubeColorVec);
-			DrawCube(ModelShaderHandler, eye,
-				5.25f, -10.5f, 10.5f,
-				glm::vec3(0.3f, 0.3f, 0.3f),
-				glm::vec3(1.0f, 1.0f, 1.0f),
-				glm::vec3(0.3f, 0.3f, 0.3f),
-				3.0f);
+			//glUniform4fv(ObjColorLoc, 1, CubeColorVec);
+			//DrawCube(ModelShaderHandler, eye,
+			//	5.25f, -10.5f, 10.5f,
+			//	glm::vec3(0.3f, 0.3f, 0.3f),
+			//	glm::vec3(1.0f, 1.0f, 1.0f),
+			//	glm::vec3(0.3f, 0.3f, 0.3f),
+			//	3.0f);
 
-			// Inner object first.
-			glUniform4fv(ObjColorLoc, 1, BoneColorVec);
-			BoneModel.Draw(ModelShaderHandler, glm::vec3(0.3f, 0.3f, 0.3f),
-						   glm::vec3(0.5f, 0.5f, 0.5f),
-						   glm::vec3(0.3f, 0.3f, 0.3f));
-			//BoneModel.Draw(ModelShaderHandler);
+			//// Inner object first.
+			//glUniform4fv(ObjColorLoc, 1, BoneColorVec);
+			//BoneModel.Draw(ModelShaderHandler, glm::vec3(0.3f, 0.3f, 0.3f),
+			//			   glm::vec3(0.5f, 0.5f, 0.5f),
+			//			   glm::vec3(0.3f, 0.3f, 0.3f));
+			////BoneModel.Draw(ModelShaderHandler);
 
-			// Draw outside object latter
-			glUniform4fv(ObjColorLoc, 1, FaceColorVec);
-			FaceModel.Draw(ModelShaderHandler, glm::vec3(0.3f, 0.3f, 0.3f),
-						   glm::vec3(0.5f, 0.5f, 0.5f),
-						   glm::vec3(0.3f, 0.3f, 0.3f));
-			//FaceModel.Draw(ModelShaderHandler);
+			//// Draw outside object latter
+			//glUniform4fv(ObjColorLoc, 1, FaceColorVec);
+			//FaceModel.Draw(ModelShaderHandler, glm::vec3(0.3f, 0.3f, 0.3f),
+			//			   glm::vec3(0.5f, 0.5f, 0.5f),
+			//			   glm::vec3(0.3f, 0.3f, 0.3f));
+			////FaceModel.Draw(ModelShaderHandler);
 			#pragma endregion
+			
 
 			//DrawAxes(AxesShaderHandler, 0.3f, eye);
-			DrawPath(AxesShaderHandler, eye);
+			//DrawPath(AxesShaderHandler, eye);
 
 			glDisable(GL_DEPTH_TEST);
 
 			#pragma region // Render medical image slice to the frame buffer
-			ImgShader.Use();
-			glUniformMatrix4fv(ImgSceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
-			glUniformMatrix4fv(ImgProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
-			glUniformMatrix4fv(ImgViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
-			glUniformMatrix4fv(ImgModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
-			glUniformMatrix4fv(TransCT2ModelLoc, 1, GL_FALSE, glm::value_ptr(TransCT2Model));
-			//DrawImage(AxiImg, ImgShader);
+			//ImgShader.Use();
+			//glUniformMatrix4fv(ImgSceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
+			//glUniformMatrix4fv(ImgProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
+			//glUniformMatrix4fv(ImgViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
+			//glUniformMatrix4fv(ImgModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
+			//glUniformMatrix4fv(TransCT2ModelLoc, 1, GL_FALSE, glm::value_ptr(TransCT2Model));
+			////DrawImage(AxiImg, ImgShader);
 			#pragma endregion
 
 			glUseProgram(0);
@@ -300,6 +431,7 @@ int main()
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glBlitFramebuffer(0, 0, framebufferWidth, framebufferHeight, 0, 0, 640, 720, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, GL_NONE);
+		*/
 
 		glfwSwapBuffers(window);
 	}
@@ -993,6 +1125,51 @@ void DrawCube(kuShaderHandler cubeShader, int eyeSide,
 	glBindVertexArray(VertexArray);
 	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
+}
+
+void RenderText(kuShaderHandler & shader, std::string text, GLfloat x, GLfloat y, GLfloat scale, glm::vec3 color)
+{
+	// Activate corresponding render state	
+	shader.Use();
+	glUniform3f(glGetUniformLocation(shader.ShaderProgramID, "textColor"), color.x, color.y, color.z);
+	glActiveTexture(GL_TEXTURE0);
+	glBindVertexArray(VAO);
+
+	// Iterate through all characters
+	std::string::const_iterator c;
+	for (c = text.begin(); c != text.end(); c++)
+	{
+		Character ch = Characters[*c];
+
+		GLfloat xpos = x + ch.Bearing.x * scale;
+		GLfloat ypos = y - (ch.Size.y - ch.Bearing.y) * scale;
+
+		GLfloat w = ch.Size.x * scale;
+		GLfloat h = ch.Size.y * scale;
+		// Update VBO for each character
+		GLfloat vertices[6][4] = {
+			{ xpos,     ypos + h,   0.0, 0.0 },
+			{ xpos,     ypos,       0.0, 1.0 },
+			{ xpos + w, ypos,       1.0, 1.0 },
+
+			{ xpos,     ypos + h,   0.0, 0.0 },
+			{ xpos + w, ypos,       1.0, 1.0 },
+			{ xpos + w, ypos + h,   1.0, 0.0 }
+		};
+		// Render glyph texture over quad
+		glBindTexture(GL_TEXTURE_2D, ch.TextureID);
+		// Update content of VBO memory
+		glBindBuffer(GL_ARRAY_BUFFER, VBO);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); // Be sure to use glBufferSubData and not glBufferData
+
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		// Render quad
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+		// Now advance cursors for next glyph (note that advance is number of 1/64 pixels)
+		x += (ch.Advance >> 6) * scale; // Bitshift by 6 to get value in pixels (2^6 = 64 (divide amount of 1/64th pixels by 64 to get amount of pixels))
+	}
+	glBindVertexArray(0);
+	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 Matrix4 ConvertSteamVRMatrixToMatrix4(const vr::HmdMatrix34_t &matPose)

@@ -70,5 +70,11 @@
     <None Include="AxesVertexShader.vert">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="TextShader.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="TextShader.frag">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
