@@ -33,6 +33,9 @@
 #define nearPlaneZ	0.1
 #define farPlaneZ	1000
 
+#define Cos(th) cos(pi/180*(th))
+#define Sin(th) sin(pi/180*(th))
+
 using namespace std;
 using namespace cv;
 
@@ -71,7 +74,7 @@ glm::vec3 CameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
 glm::vec3 CameraUp    = glm::vec3(0.0f, 1.0f, 0.0f);
 
 
-bool			keyPressArray[1024];
+bool				keyPressArray[1024];
 
 void				Init();
 GLFWwindow		*	initOpenGL(int width, int height, const std::string& title, GLFWkeyfun cbfun);
@@ -161,24 +164,8 @@ const GLuint WIDTH = 800, HEIGHT = 600;
 
 int main()
 {
-	//Init();
-	// Init GLFW
-	glfwInit();
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+	Init();
 
-	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "LearnOpenGL", nullptr, nullptr); // Windowed
-	glfwMakeContextCurrent(window);
-
-	// Initialize GLEW to setup the OpenGL Function pointers
-	glewExperimental = GL_TRUE;
-	glewInit();
-
-	// Define the viewport dimensions
-	glViewport(0, 0, WIDTH, HEIGHT);
-	
 	// Set OpenGL options
 	glEnable(GL_CULL_FACE);
 	glEnable(GL_BLEND);
@@ -251,22 +238,19 @@ int main()
 	FT_Done_FreeType(ft);
 	#pragma endregion
 
-	//kuModelObject	Model("LAI-WEN-HSIEN-big.surf.stl");
-	//kuModelObject	Model("1.stl");
+	kuModelObject		FaceModel("kuFace_7d5wf_SG_Center.stl");
+	kuModelObject		BoneModel("kuBone_7d5wf_SG_Center.stl");
 
-	//kuModelObject		FaceModel("kuFace_7d5wf_SG_Center.stl");
-	//kuModelObject		BoneModel("kuBone_7d5wf_SG_Center.stl");
-
-	/*kuShaderHandler		ModelShaderHandler;
+	kuShaderHandler		ModelShaderHandler;
 	kuShaderHandler		ImgShader;
-	kuShaderHandler		AxesShaderHandler;*/
+	kuShaderHandler		AxesShaderHandler;
 	
 
-	//ModelShaderHandler.Load("ModelVertexShader.vert", "ModelFragmentShader.frag");
-	//ImgShader.Load("ImgVertexShader.vert", "ImgFragmentShader.frag");
-	//AxesShaderHandler.Load("AxesVertexShader.vert", "AxesFragmentShader.frag");
+	ModelShaderHandler.Load("ModelVertexShader.vert", "ModelFragmentShader.frag");
+	ImgShader.Load("ImgVertexShader.vert", "ImgFragmentShader.frag");
+	AxesShaderHandler.Load("AxesVertexShader.vert", "AxesFragmentShader.frag");
 	
-	/*
+	
 	TransCT2Model = glm::translate(TransCT2Model, glm::vec3(-128.249, -281.249, -287));
 
 	// Set model shader uniform location
@@ -304,7 +288,7 @@ int main()
 	//ModelMat = glm::scale(ModelMat, glm::vec3(0.005f, 0.005f, 0.005f));
 	float modelScale = 0.005f;
 	ModelMat = glm::scale(ModelMat, glm::vec3(modelScale, modelScale, modelScale));
-	*/
+	
 
 	// Configure VAO/VBO for texture quads
 	glGenVertexArrays(1, &VAO);
@@ -325,11 +309,12 @@ int main()
 		// Clear the colorbuffer
 		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
-
+		
+		
 		RenderText(TextShaderHandler, "This is sample text", 25.0f, 25.0f, 1.0f, glm::vec3(0.5, 0.8f, 0.2f));
 		RenderText(TextShaderHandler, "(C) LearnOpenGL.com", 540.0f, 570.0f, 0.5f, glm::vec3(0.3, 0.7f, 0.9f));
 
-		/*
+		
 		GLfloat currFrameT = glfwGetTime();
 		deltaTime = currFrameT - lastFrameT;
 		lastFrameT = currFrameT;
@@ -368,33 +353,33 @@ int main()
 
 			
 			#pragma region // Render virtual model to the frame buffer //
-			//ModelShaderHandler.Use();
-			//glUniformMatrix4fv(SceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
-			//glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
-			//glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
-			//glUniformMatrix4fv(ModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
-			//glUniform3fv(CamPosLoc, 1, glm::value_ptr(CameraPos));
+			ModelShaderHandler.Use();
+			glUniformMatrix4fv(SceneMatrixLocation, 1, GL_FALSE, MVPMat[eye].get());
+			glUniformMatrix4fv(ProjMatLoc, 1, GL_FALSE, glm::value_ptr(ProjMat));
+			glUniformMatrix4fv(ViewMatLoc, 1, GL_FALSE, glm::value_ptr(ViewMat));
+			glUniformMatrix4fv(ModelMatLoc, 1, GL_FALSE, glm::value_ptr(ModelMat));
+			glUniform3fv(CamPosLoc, 1, glm::value_ptr(CameraPos));
 
-			//glUniform4fv(ObjColorLoc, 1, CubeColorVec);
-			//DrawCube(ModelShaderHandler, eye,
-			//	5.25f, -10.5f, 10.5f,
-			//	glm::vec3(0.3f, 0.3f, 0.3f),
-			//	glm::vec3(1.0f, 1.0f, 1.0f),
-			//	glm::vec3(0.3f, 0.3f, 0.3f),
-			//	3.0f);
+			glUniform4fv(ObjColorLoc, 1, CubeColorVec);
+			DrawCube(ModelShaderHandler, eye,
+				5.25f, -10.5f, 10.5f,
+				glm::vec3(0.3f, 0.3f, 0.3f),
+				glm::vec3(1.0f, 1.0f, 1.0f),
+				glm::vec3(0.3f, 0.3f, 0.3f),
+				3.0f);
 
-			//// Inner object first.
-			//glUniform4fv(ObjColorLoc, 1, BoneColorVec);
-			//BoneModel.Draw(ModelShaderHandler, glm::vec3(0.3f, 0.3f, 0.3f),
-			//			   glm::vec3(0.5f, 0.5f, 0.5f),
-			//			   glm::vec3(0.3f, 0.3f, 0.3f));
-			////BoneModel.Draw(ModelShaderHandler);
+			// Inner object first.
+			glUniform4fv(ObjColorLoc, 1, BoneColorVec);
+			BoneModel.Draw(ModelShaderHandler, glm::vec3(0.3f, 0.3f, 0.3f),
+						   glm::vec3(0.5f, 0.5f, 0.5f),
+						   glm::vec3(0.3f, 0.3f, 0.3f));
+			//BoneModel.Draw(ModelShaderHandler);
 
 			//// Draw outside object latter
-			//glUniform4fv(ObjColorLoc, 1, FaceColorVec);
-			//FaceModel.Draw(ModelShaderHandler, glm::vec3(0.3f, 0.3f, 0.3f),
-			//			   glm::vec3(0.5f, 0.5f, 0.5f),
-			//			   glm::vec3(0.3f, 0.3f, 0.3f));
+			glUniform4fv(ObjColorLoc, 1, FaceColorVec);
+			FaceModel.Draw(ModelShaderHandler, glm::vec3(0.3f, 0.3f, 0.3f),
+						   glm::vec3(0.5f, 0.5f, 0.5f),
+						   glm::vec3(0.3f, 0.3f, 0.3f));
 			////FaceModel.Draw(ModelShaderHandler);
 			#pragma endregion
 			
@@ -431,7 +416,6 @@ int main()
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glBlitFramebuffer(0, 0, framebufferWidth, framebufferHeight, 0, 0, 640, 720, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, GL_NONE);
-		*/
 
 		glfwSwapBuffers(window);
 	}
@@ -1005,7 +989,7 @@ void DrawPath(kuShaderHandler axesShader, int eyeSide)
 	//glDrawArrays(GL_TRIANGLES, 0, 3); // Starting from vertex 0; 3 vertices total -> 1 triangle
 	glEnable(GL_LINE_SMOOTH);
 	glLineWidth(10);
-	glDrawArrays(GL_LINES, 0, 2); // Starting from vertex 0; 3 vertices total -> 1 triangle
+	glDrawArrays(GL_LINES, 0, 2);		// Starting from vertex 0; 3 vertices total -> 1 triangle
 	glBindVertexArray(0);
 }
 
@@ -1016,10 +1000,10 @@ void DrawCube(kuShaderHandler cubeShader, int eyeSide,
 	const GLfloat	vertices[]
 		= {
 		// Frontal Face
-		posX - cubeSize, posY + cubeSize, posZ + cubeSize,		// 0:  Top Left  
+		posX - cubeSize, posY + cubeSize, posZ + cubeSize,			// 0:  Top Left  
 		posX + cubeSize, posY + cubeSize, posZ + cubeSize,			// 1:  Top Right
 		posX + cubeSize, posY - cubeSize, posZ + cubeSize,			// 2:  Bottom Right
-		posX - cubeSize, posY - cubeSize, posZ + cubeSize,		// 3:  Bottom Left
+		posX - cubeSize, posY - cubeSize, posZ + cubeSize,			// 3:  Bottom Left
 							
 		// Right Face	po	Y + s		posZ +
 		posX - cubeSize, posY + cubeSize, posZ - cubeSize,			// 4:  Top Left
