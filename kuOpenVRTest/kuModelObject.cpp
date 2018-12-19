@@ -137,7 +137,6 @@ kuMesh kuModelObject::processMesh(aiMesh * mesh, const aiScene * scene)
 	}
 #pragma endregion
 
-	// 嗯 看不懂 改天k完lighting再說
 	aiColor4D diffuse;
 	aiColor4D specular;
 	aiColor4D ambient;
